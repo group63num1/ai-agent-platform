@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.demo.app.mapper.PrivacyDataMapper">
+
+    <resultMap id="PrivacyDataResultMap" type="com.example.demo.app.entity.PrivacyData">
+        <id column="id" property="id" />
+        <result column="user_id" property="userId" />
+        <result column="session_id" property="sessionId" />
+        <result column="data_type" property="dataType" />
+        <result column="data_value" property="dataValue" />
+        <result column="data_hash" property="dataHash" />
+        <result column="source" property="source" />
+        <result column="action" property="action" />
+        <result column="retention_days" property="retentionDays" />
+        <result column="expires_at" property="expiresAt" />
+        <result column="created_at" property="createdAt" />
+        <result column="updated_at" property="updatedAt" />
+        <result column="deleted_at" property="deletedAt" />
+    </resultMap>
+
+    <sql id="PrivacyData_Column_List">
+        id, user_id, session_id, data_type, data_value, data_hash, source, action,
+        retention_days, expires_at, created_at, updated_at, deleted_at
+    </sql>
+
+    <insert id="insert" parameterType="com.example.demo.app.entity.PrivacyData"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO privacy_data (
+            user_id, session_id, data_type, data_value, data_hash, source, action,
+            retention_days, expires_at, created_at, updated_at
+        ) VALUES (
+            #{userId}, #{sessionId}, #{dataType}, #{dataValue}, #{dataHash}, #{source}, #{action},
+            #{retentionDays}, #{expiresAt}, NOW(), NOW()
+        )
+    </insert>
+
+    <select id="selectById" resultMap="PrivacyDataResultMap">
+        SELECT <include refid="PrivacyData_Column_List" />
+        FROM privacy_data
+        WHERE id = #{id} AND deleted_at IS NULL
+    </select>
+
+    <select id="selectByUserId" resultMap="PrivacyDataResultMap">
+        SELECT <include refid="PrivacyData_Column_List" />
+        FROM privacy_data
+        WHERE user_id = #{userId} AND deleted_at IS NULL
+        ORDER BY created_at DESC
+    </select>
+
+    <select id="selectBySessionId" resultMap="PrivacyDataResultMap">
+        SELECT <include refid="PrivacyData_Column_List" />
+        FROM privacy_data
+        WHERE session_id = #{sessionId} AND deleted_at IS NULL
+        ORDER BY created_at DESC
+    </select>
+
+    <select id="selectByDataType" resultMap="PrivacyDataResultMap">
+        SELECT <include refid="PrivacyData_Column_List" />
+        FROM privacy_data
+        WHERE data_type = #{dataType} AND deleted_at IS NULL
+        ORDER BY created_at DESC
+    </select>
+
+    <select id="selectByDataHash" resultMap="PrivacyDataResultMap">
+        SELECT <include refid="PrivacyData_Column_List" />
+        FROM privacy_data
+        WHERE data_hash = #{dataHash} AND deleted_at IS NULL
+        ORDER BY created_at DESC
+    </select>
+
+    <select id="selectExpired" resultMap="PrivacyDataResultMap">
+        SELECT <include refid="PrivacyData_Column_List" />
+        FROM privacy_data
+        WHERE expires_at IS NOT NULL
+        AND expires_at &lt;= NOW()
+        AND deleted_at IS NULL
+    </select>
+
+    <update id="update" parameterType="com.example.demo.app.entity.PrivacyData">
+        UPDATE privacy_data
+        <set>
+            <if test="dataType != null">data_type = #{dataType},</if>
+            <if test="dataValue != null">data_value = #{dataValue},</if>
+            <if test="dataHash != null">data_hash = #{dataHash},</if>
+            <if test="source != null">source = #{source},</if>
+            <if test="action != null">action = #{action},</if>
+            <if test="retentionDays != null">retention_days = #{retentionDays},</if>
+            <if test="expiresAt != null">expires_at = #{expiresAt},</if>
+            updated_at = NOW()
+        </set>
+        WHERE id = #{id} AND deleted_at IS NULL
+    </update>
+
+    <update id="softDelete">
+        UPDATE privacy_data
+        SET deleted_at = NOW(), updated_at = NOW()
+        WHERE id = #{id} AND deleted_at IS NULL
+    </update>
+
+    <delete id="deleteExpired">
+        DELETE FROM privacy_data
+        WHERE expires_at IS NOT NULL
+        AND expires_at &lt;= NOW()
+        AND deleted_at IS NULL
+    </delete>
+
+    <select id="countByUserId" resultType="int">
+        SELECT COUNT(*)
+        FROM privacy_data
+        WHERE user_id = #{userId} AND deleted_at IS NULL
+    </select>
+
+    <select id="countByDataType" resultType="int">
+        SELECT COUNT(*)
+        FROM privacy_data
+        WHERE data_type = #{dataType} AND deleted_at IS NULL
+    </select>
+
+</mapper>
+

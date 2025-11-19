@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.demo.app.mapper.ChatMessageMapper">
+
+    <resultMap id="ChatMessageResultMap" type="com.example.demo.app.entity.ChatMessage">
+        <id column="id" property="id" />
+        <result column="session_id" property="sessionId" />
+        <result column="role" property="role" />
+        <result column="content" property="content" />
+        <result column="created_at" property="createdAt" />
+    </resultMap>
+
+    <sql id="ChatMessage_Column_List">
+        id, session_id, role, content, created_at
+    </sql>
+
+    <insert id="insert" parameterType="com.example.demo.app.entity.ChatMessage"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO chat_message (
+            session_id, role, content, created_at
+        ) VALUES (
+            #{sessionId}, #{role}, #{content}, NOW()
+        )
+    </insert>
+
+    <select id="selectById" resultMap="ChatMessageResultMap">
+        SELECT <include refid="ChatMessage_Column_List" />
+        FROM chat_message
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectBySessionId" resultMap="ChatMessageResultMap">
+        SELECT <include refid="ChatMessage_Column_List" />
+        FROM chat_message
+        WHERE session_id = #{sessionId}
+        ORDER BY id ASC
+    </select>
+
+    <select id="selectBySessionIdWithPagination" resultMap="ChatMessageResultMap">
+        SELECT <include refid="ChatMessage_Column_List" />
+        FROM chat_message
+        WHERE session_id = #{sessionId}
+        <if test="lastMessageId != null">
+            AND id > #{lastMessageId}
+        </if>
+        ORDER BY id ASC
+        LIMIT #{limit}
+    </select>
+
+    <delete id="deleteBySessionId">
+        DELETE FROM chat_message
+        WHERE session_id = #{sessionId}
+    </delete>
+
+    <select id="countBySessionId" resultType="int">
+        SELECT COUNT(*)
+        FROM chat_message
+        WHERE session_id = #{sessionId}
+    </select>
+
+</mapper>
+

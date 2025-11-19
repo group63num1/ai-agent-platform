@@ -1,0 +1,108 @@
+spring:
+  application:
+    name: health-agent-api
+  profiles:
+    # ⭐ 关键：支持通过环境变量切换环境
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+
+  datasource:
+    # ⭐ 默认值为 localhost（本地开发），Docker 中通过环境变量覆盖
+    url: ${DATASOURCE_URL:jdbc:mysql://localhost:3306/your_database?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf8&allowPublicKeyRetrieval=true}
+    username: ${DATASOURCE_USERNAME:your_username}
+    password: ${DATASOURCE_PASSWORD:your_password}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  
+  # 添加JPA配置（可选，用于自动创建表）
+  jpa:
+    hibernate:
+      ddl-auto: validate  # 设置为validate，不自动创建表
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL8Dialect
+        format_sql: true
+  
+  # 邮件配置
+  mail:
+    host: smtp.qq.com  # 根据你的邮箱服务商修改
+    port: 587
+    username: 1749683268@qq.com  # 你的邮箱
+    password: akhglfurjpldecddakhglfurjpldecdd  # 你的邮箱授权码
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
+server:
+  port: 28080
+
+# MyBatis 配置
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.example.demo.app.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+# JWT配置
+jwt:
+  secret: ${JWT_SECRET:health-agent-secret-key-2025-please-change-in-production}
+  expiration: ${JWT_EXPIRATION:86400000}  # 24小时
+  header: Authorization
+  prefix: Bearer
+
+# 日志配置
+logging:
+  level:
+    com.example.demo.app.mapper: debug
+    com.example.demo: debug
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# 验证码配置
+verification:
+  code:
+    length: 6
+    expire:
+      minutes: 5
+  rate:
+    limit:
+      minutes: 1
+
+# RAG配置（如果项目有）
+rag:
+  service-base-url: ${RAG_SERVICE_BASE_URL:http://localhost:8801}
+  timeout-ms: 3000
+  alpha: 0.7
+  beta: 0.3
+
+# Knife4j配置
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn
+
+# LLM API配置
+llm:
+  provider: ${LLM_PROVIDER:tencent}  # 提供商：tencent(腾讯云) 或 openai
+  api-key: ${LLM_API_KEY:AKIDpkeRgsxvjNvKZfcKtJas12udFh09B3lK:WuEQSOCrNk07EE4lJi2CDCmDVdcS8sUx}
+  api-url: ${LLM_API_URL:https://hunyuan.tencentcloudapi.com}
+  model: ${LLM_MODEL:hunyuan-lite}
+  max-tokens: 1000
+  temperature: 0.7
+  timeout: 30000
+  chat:
+    system-prompt: "你是一个专业的智能客服助手，能够准确理解用户的问题并提供有帮助的回答。请用友好、专业、简洁的方式回答问题。如果用户提到之前对话的内容，请根据上下文进行回答。"
+    max-history: 30

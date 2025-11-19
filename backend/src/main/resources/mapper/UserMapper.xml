@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.demo.app.mapper.UserMapper">
+
+    <resultMap id="UserResultMap" type="com.example.demo.app.entity.User">
+        <id column="id" property="id" />
+        <result column="username" property="username" />
+        <result column="email" property="email" />
+        <result column="phone" property="phone" />
+        <result column="password_hash" property="passwordHash" />
+        <result column="nickname" property="nickname" />
+        <result column="avatar_url" property="avatarUrl" />
+        <result column="bio" property="bio" />
+        <result column="status" property="status" />
+        <result column="email_verified" property="emailVerified" />
+        <result column="phone_verified" property="phoneVerified" />
+        <result column="login_attempts" property="loginAttempts" />
+        <result column="locked_until" property="lockedUntil" />
+        <result column="last_login_at" property="lastLoginAt" />
+        <result column="last_login_ip" property="lastLoginIp" />
+        <result column="created_at" property="createdAt" />
+        <result column="updated_at" property="updatedAt" />
+        <result column="deleted_at" property="deletedAt" />
+    </resultMap>
+
+    <sql id="User_Column_List">
+        id, username, email, phone, password_hash, nickname, avatar_url, bio,
+        status, email_verified, phone_verified, login_attempts, locked_until,
+        last_login_at, last_login_ip, created_at, updated_at, deleted_at
+    </sql>
+
+    <insert id="insert" parameterType="com.example.demo.app.entity.User"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO users (
+            username,
+            <if test="email != null and email != ''">email,</if>
+            <if test="phone != null and phone != ''">phone,</if>
+            password_hash,
+            <if test="nickname != null and nickname != ''">nickname,</if>
+            <if test="avatarUrl != null and avatarUrl != ''">avatar_url,</if>
+            <if test="bio != null and bio != ''">bio,</if>
+            status,
+            email_verified,
+            phone_verified,
+            login_attempts,
+            <if test="lockedUntil != null">locked_until,</if>
+            created_at, updated_at
+        ) VALUES (
+            #{username},
+            <if test="email != null and email != ''">#{email},</if>
+            <if test="phone != null and phone != ''">#{phone},</if>
+            #{passwordHash},
+            <if test="nickname != null and nickname != ''">#{nickname},</if>
+            <if test="avatarUrl != null and avatarUrl != ''">#{avatarUrl},</if>
+            <if test="bio != null and bio != ''">#{bio},</if>
+            #{status},
+            #{emailVerified},
+            #{phoneVerified},
+            #{loginAttempts},
+            <if test="lockedUntil != null">#{lockedUntil},</if>
+            NOW(), NOW()
+        )
+    </insert>
+
+    <select id="selectById" resultMap="UserResultMap">
+        SELECT <include refid="User_Column_List" />
+        FROM users
+        WHERE id = #{id} AND deleted_at IS NULL
+    </select>
+
+    <select id="selectByUsername" resultMap="UserResultMap">
+        SELECT <include refid="User_Column_List" />
+        FROM users
+        WHERE username = #{username} AND deleted_at IS NULL
+    </select>
+
+    <select id="selectByEmail" resultMap="UserResultMap">
+        SELECT <include refid="User_Column_List" />
+        FROM users
+        WHERE email = #{email} AND deleted_at IS NULL
+    </select>
+
+    <select id="selectByPhone" resultMap="UserResultMap">
+        SELECT <include refid="User_Column_List" />
+        FROM users
+        WHERE phone = #{phone} AND deleted_at IS NULL
+    </select>
+
+    <select id="selectAll" resultMap="UserResultMap">
+        SELECT <include refid="User_Column_List" />
+        FROM users
+        WHERE deleted_at IS NULL
+    </select>
+
+
+    <update id="update" parameterType="com.example.demo.app.entity.User">
+        UPDATE users
+        <set>
+            <if test="username != null">username = #{username},</if>
+            <if test="email != null">email = #{email},</if>
+            <if test="phone != null">phone = #{phone},</if>
+            <if test="passwordHash != null">password_hash = #{passwordHash},</if>
+            <if test="nickname != null">nickname = #{nickname},</if>
+            <if test="avatarUrl != null">avatar_url = #{avatarUrl},</if>
+            <if test="bio != null">bio = #{bio},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="emailVerified != null">email_verified = #{emailVerified},</if>
+            <if test="phoneVerified != null">phone_verified = #{phoneVerified},</if>
+            <if test="loginAttempts != null">login_attempts = #{loginAttempts},</if>
+            <if test="lockedUntil != null">locked_until = #{lockedUntil},</if>
+            <if test="lastLoginAt != null">last_login_at = #{lastLoginAt},</if>
+            <if test="lastLoginIp != null">last_login_ip = #{lastLoginIp},</if>
+            updated_at = NOW()
+        </set>
+        WHERE id = #{id} AND deleted_at IS NULL
+    </update>
+
+    <update id="softDelete">
+        UPDATE users
+        SET deleted_at = NOW(), updated_at = NOW()
+        WHERE id = #{id} AND deleted_at IS NULL
+    </update>
+
+    <delete id="hardDelete">
+        DELETE FROM users
+        WHERE id = #{id}
+    </delete>
+
+    <update id="updateLoginInfo">
+        UPDATE users
+        SET last_login_at = #{lastLoginAt},
+            last_login_ip = #{lastLoginIp},
+            updated_at = NOW()
+        WHERE id = #{id} AND deleted_at IS NULL
+    </update>
+
+    <update id="updateLoginAttempts">
+        UPDATE users
+        SET login_attempts = #{loginAttempts},
+            locked_until = #{lockedUntil},
+            updated_at = NOW()
+        WHERE id = #{id} AND deleted_at IS NULL
+    </update>
+
+    <update id="updatePassword">
+        UPDATE users
+        SET password_hash = #{passwordHash},
+            updated_at = NOW()
+        WHERE id = #{id} AND deleted_at IS NULL
+    </update>
+
+    <update id="updateStatus">
+        UPDATE users
+        SET status = #{status},
+            updated_at = NOW()
+        WHERE id = #{id} AND deleted_at IS NULL
+    </update>
+
+    <update id="updateEmailVerified">
+        UPDATE users
+        SET email_verified = #{emailVerified},
+            updated_at = NOW()
+        WHERE id = #{id} AND deleted_at IS NULL
+    </update>
+
+    <update id="updatePhoneVerified">
+        UPDATE users
+        SET phone_verified = #{phoneVerified},
+            updated_at = NOW()
+        WHERE id = #{id} AND deleted_at IS NULL
+    </update>
+
+</mapper>

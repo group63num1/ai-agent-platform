@@ -1,0 +1,17 @@
+spring:
+  datasource:
+    # ⭐  覆盖数据库 URL：使用 Docker 服务名 'mysql'
+    # ⭐  覆盖数据库名：使用 health_agent_db（与 docker-compose.yml 一致）
+    url: ${DATASOURCE_URL:jdbc:mysql://mysql:3306/health_agent_db?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf8&allowPublicKeyRetrieval=true}
+    username: ${DATASOURCE_USERNAME:root}
+    password: ${DATASOURCE_PASSWORD:123456}
+
+# 生产环境日志级别（可选）
+logging:
+  level:
+    root: WARN
+    com.health.agent: INFO
+
+# 关闭 Swagger（生产环境建议关闭，可选）
+knife4j:
+  enable: false

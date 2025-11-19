@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.demo.app.mapper.PermissionMapper">
+
+    <resultMap id="PermissionResultMap" type="com.example.demo.app.entity.Permission">
+        <id column="id" property="id" />
+        <result column="name" property="name" />
+        <result column="code" property="code" />
+        <result column="description" property="description" />
+        <result column="module" property="module" />
+        <result column="resource" property="resource" />
+        <result column="action" property="action" />
+        <result column="is_system" property="isSystem" />
+        <result column="status" property="status" />
+        <result column="sort_order" property="sortOrder" />
+        <result column="created_at" property="createdAt" />
+        <result column="updated_at" property="updatedAt" />
+        <result column="deleted_at" property="deletedAt" />
+    </resultMap>
+
+    <sql id="Permission_Column_List">
+        id, name, code, description, module, resource, action,
+        is_system, status, sort_order, created_at, updated_at, deleted_at
+    </sql>
+
+    <insert id="insert" parameterType="com.example.demo.app.entity.Permission"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO permissions (
+            name, code, description, module, resource, action,
+            is_system, status, sort_order, created_at, updated_at
+        ) VALUES (
+                     #{name}, #{code}, #{description}, #{module}, #{resource}, #{action},
+                     #{isSystem}, #{status}, #{sortOrder}, NOW(), NOW()
+                 )
+    </insert>
+
+    <select id="selectById" resultMap="PermissionResultMap">
+        SELECT <include refid="Permission_Column_List" />
+        FROM permissions
+        WHERE id = #{id} AND deleted_at IS NULL
+    </select>
+
+    <select id="selectByCode" resultMap="PermissionResultMap">
+        SELECT <include refid="Permission_Column_List" />
+        FROM permissions
+        WHERE code = #{code} AND deleted_at IS NULL
+    </select>
+
+    <select id="selectAll" resultMap="PermissionResultMap">
+        SELECT <include refid="Permission_Column_List" />
+        FROM permissions
+        WHERE deleted_at IS NULL
+        ORDER BY module, sort_order ASC
+    </select>
+
+    <select id="selectByModule" resultMap="PermissionResultMap">
+        SELECT <include refid="Permission_Column_List" />
+        FROM permissions
+        WHERE module = #{module} AND deleted_at IS NULL
+        ORDER BY sort_order ASC
+    </select>
+
+    <select id="selectByRoleId" resultMap="PermissionResultMap">
+        SELECT p.id, p.name, p.code, p.description, p.module, p.resource, p.action,
+               p.is_system, p.status, p.sort_order, p.created_at, p.updated_at, p.deleted_at
+        FROM permissions p
+                 INNER JOIN role_permissions rp ON p.id = rp.permission_id
+        WHERE rp.role_id = #{roleId} AND p.deleted_at IS NULL
+        ORDER BY p.module, p.sort_order ASC
+    </select>
+
+    <select id="selectByUserId" resultMap="PermissionResultMap">
+        SELECT DISTINCT p.id, p.name, p.code, p.description, p.module, p.resource, p.action,
+                        p.is_system, p.status, p.sort_order, p.created_at, p.updated_at, p.deleted_at
+        FROM permissions p
+                 INNER JOIN role_permissions rp ON p.id = rp.permission_id
+                 INNER JOIN user_roles ur ON rp.role_id = ur.role_id
+        WHERE ur.user_id = #{userId}
+          AND p.deleted_at IS NULL
+          AND (ur.expires_at IS NULL OR ur.expires_at > NOW())
+        ORDER BY p.module, p.sort_order ASC
+    </select>
+
+    <select id="selectModules" resultType="java.lang.String">
+        SELECT DISTINCT module
+        FROM permissions
+        WHERE deleted_at IS NULL
+        ORDER BY module
+    </select>
+
+    <update id="update" parameterType="com.example.demo.app.entity.Permission">
+        UPDATE permissions
+        <set>
+            <if test="name != null">name = #{name},</if>
+            <if test="code != null">code = #{code},</if>
+            <if test="description != null">description = #{description},</if>
+            <if test="module != null">module = #{module},</if>
+            <if test="resource != null">resource = #{resource},</if>
+            <if test="action != null">action = #{action},</if>
+            <if test="isSystem != null">is_system = #{isSystem},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="sortOrder != null">sort_order = #{sortOrder},</if>
+            updated_at = NOW()
+        </set>
+        WHERE id = #{id} AND deleted_at IS NULL
+    </update>
+
+    <update id="softDelete">
+        UPDATE permissions
+        SET deleted_at = NOW(), updated_at = NOW()
+        WHERE id = #{id} AND deleted_at IS NULL AND is_system = 0
+    </update>
+
+</mapper>

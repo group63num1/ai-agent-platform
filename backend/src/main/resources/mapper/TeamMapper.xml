@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.demo.app.mapper.TeamMapper">
+
+    <resultMap id="TeamResultMap" type="com.example.demo.app.entity.Team">
+        <id column="id" property="id" />
+        <result column="name" property="name" />
+        <result column="code" property="code" />
+        <result column="description" property="description" />
+        <result column="avatar_url" property="avatarUrl" />
+        <result column="visibility" property="visibility" />
+        <result column="join_policy" property="joinPolicy" />
+        <result column="max_members" property="maxMembers" />
+        <result column="owner_id" property="ownerId" />
+        <result column="status" property="status" />
+        <result column="settings" property="settings" />
+        <result column="created_at" property="createdAt" />
+        <result column="updated_at" property="updatedAt" />
+        <result column="deleted_at" property="deletedAt" />
+    </resultMap>
+
+    <sql id="Team_Column_List">
+        id, name, code, description, avatar_url, visibility, join_policy,
+        max_members, owner_id, status, settings, created_at, updated_at, deleted_at
+    </sql>
+
+    <insert id="insert" parameterType="com.example.demo.app.entity.Team"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO teams (
+            name, code, description, avatar_url, visibility, join_policy,
+            max_members, owner_id, status, settings, created_at, updated_at
+        ) VALUES (
+                     #{name}, #{code}, #{description}, #{avatarUrl}, #{visibility}, #{joinPolicy},
+                     #{maxMembers}, #{ownerId}, #{status}, #{settings}, NOW(), NOW()
+                 )
+    </insert>
+
+    <select id="selectById" resultMap="TeamResultMap">
+        SELECT <include refid="Team_Column_List" />
+        FROM teams
+        WHERE id = #{id} AND deleted_at IS NULL
+    </select>
+
+    <select id="selectByCode" resultMap="TeamResultMap">
+        SELECT <include refid="Team_Column_List" />
+        FROM teams
+        WHERE code = #{code} AND deleted_at IS NULL
+    </select>
+
+    <select id="selectByName" resultMap="TeamResultMap">
+        SELECT <include refid="Team_Column_List" />
+        FROM teams
+        WHERE name = #{name} AND deleted_at IS NULL
+    </select>
+
+    <select id="selectAll" resultMap="TeamResultMap">
+        SELECT <include refid="Team_Column_List" />
+        FROM teams
+        WHERE deleted_at IS NULL
+        ORDER BY created_at DESC
+    </select>
+
+    <select id="selectByOwnerId" resultMap="TeamResultMap">
+        SELECT <include refid="Team_Column_List" />
+        FROM teams
+        WHERE owner_id = #{ownerId} AND deleted_at IS NULL
+        ORDER BY created_at DESC
+    </select>
+
+    <select id="selectByUserId" resultMap="TeamResultMap">
+        SELECT t.id, t.name, t.code, t.description, t.avatar_url, t.visibility,
+               t.join_policy, t.max_members, t.owner_id, t.status, t.settings,
+               t.created_at, t.updated_at, t.deleted_at
+        FROM teams t
+                 INNER JOIN team_members tm ON t.id = tm.team_id
+        WHERE tm.user_id = #{userId} AND t.deleted_at IS NULL AND tm.status = 1
+        ORDER BY t.created_at DESC
+    </select>
+
+    <select id="selectByVisibility" resultMap="TeamResultMap">
+        SELECT <include refid="Team_Column_List" />
+        FROM teams
+        WHERE visibility = #{visibility} AND deleted_at IS NULL
+        ORDER BY created_at DESC
+    </select>
+
+    <update id="update" parameterType="com.example.demo.app.entity.Team">
+        UPDATE teams
+        <set>
+            <if test="name != null">name = #{name},</if>
+            <if test="code != null">code = #{code},</if>
+            <if test="description != null">description = #{description},</if>
+            <if test="avatarUrl != null">avatar_url = #{avatarUrl},</if>
+            <if test="visibility != null">visibility = #{visibility},</if>
+            <if test="joinPolicy != null">join_policy = #{joinPolicy},</if>
+            <if test="maxMembers != null">max_members = #{maxMembers},</if>
+            <if test="ownerId != null">owner_id = #{ownerId},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="settings != null">settings = #{settings},</if>
+            updated_at = NOW()
+        </set>
+        WHERE id = #{id} AND deleted_at IS NULL
+    </update>
+
+    <update id="softDelete">
+        UPDATE teams
+        SET deleted_at = NOW(), updated_at = NOW()
+        WHERE id = #{id} AND deleted_at IS NULL
+    </update>
+
+    <update id="updateStatus">
+        UPDATE teams
+        SET status = #{status}, updated_at = NOW()
+        WHERE id = #{id} AND deleted_at IS NULL
+    </update>
+
+    <select id="countByOwnerId" resultType="int">
+        SELECT COUNT(*)
+        FROM teams
+        WHERE owner_id = #{ownerId} AND deleted_at IS NULL
+    </select>
+
+</mapper>

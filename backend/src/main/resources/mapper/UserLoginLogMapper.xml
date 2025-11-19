@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.demo.app.mapper.UserLoginLogMapper">
+
+    <resultMap id="UserLoginLogResultMap" type="com.example.demo.app.entity.UserLoginLog">
+        <id column="id" property="id" />
+        <result column="user_id" property="userId" />
+        <result column="login_type" property="loginType" />
+        <result column="ip_address" property="ipAddress" />
+        <result column="user_agent" property="userAgent" />
+        <result column="device_info" property="deviceInfo" />
+        <result column="location" property="location" />
+        <result column="status" property="status" />
+        <result column="failure_reason" property="failureReason" />
+        <result column="session_id" property="sessionId" />
+        <result column="created_at" property="createdAt" />
+    </resultMap>
+
+    <sql id="UserLoginLog_Column_List">
+        id, user_id, login_type, ip_address, user_agent, device_info, location,
+        status, failure_reason, session_id, created_at
+    </sql>
+
+    <insert id="insert" parameterType="com.example.demo.app.entity.UserLoginLog"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO user_login_logs (
+            user_id, login_type, ip_address, user_agent, device_info, location,
+            status, failure_reason, session_id, created_at
+        ) VALUES (
+                     #{userId}, #{loginType}, #{ipAddress}, #{userAgent}, #{deviceInfo}, #{location},
+                     #{status}, #{failureReason}, #{sessionId}, NOW()
+                 )
+    </insert>
+
+    <select id="selectById" resultMap="UserLoginLogResultMap">
+        SELECT <include refid="UserLoginLog_Column_List" />
+        FROM user_login_logs
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByUserId" resultMap="UserLoginLogResultMap">
+        SELECT <include refid="UserLoginLog_Column_List" />
+        FROM user_login_logs
+        WHERE user_id = #{userId}
+        ORDER BY created_at DESC
+    </select>
+
+    <select id="selectByUserIdAndLimit" resultMap="UserLoginLogResultMap">
+        SELECT <include refid="UserLoginLog_Column_List" />
+        FROM user_login_logs
+        WHERE user_id = #{userId}
+        ORDER BY created_at DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectByUserIdAndTime" resultMap="UserLoginLogResultMap">
+        SELECT <include refid="UserLoginLog_Column_List" />
+        FROM user_login_logs
+        WHERE user_id = #{userId} AND created_at >= #{startTime}
+        ORDER BY created_at DESC
+    </select>
+
+    <select id="selectByIpAddress" resultMap="UserLoginLogResultMap">
+        SELECT <include refid="UserLoginLog_Column_List" />
+        FROM user_login_logs
+        WHERE ip_address = #{ipAddress}
+        ORDER BY created_at DESC
+    </select>
+
+    <select id="selectByStatus" resultMap="UserLoginLogResultMap">
+        SELECT <include refid="UserLoginLog_Column_List" />
+        FROM user_login_logs
+        WHERE status = #{status}
+        ORDER BY created_at DESC
+    </select>
+
+    <select id="countLoginAttempts" resultType="int">
+        SELECT COUNT(*)
+        FROM user_login_logs
+        WHERE user_id = #{userId}
+          AND status = 0
+          AND created_at >= #{startTime}
+    </select>
+
+    <delete id="deleteOldLogs">
+        DELETE FROM user_login_logs
+        WHERE created_at &lt; #{beforeTime}
+    </delete>
+
+</mapper>

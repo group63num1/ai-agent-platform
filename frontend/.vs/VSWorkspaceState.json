@@ -1,0 +1,16 @@
+{
+  "ExpandedNodes": [
+    "",
+    "\\src",
+    "\\src\\assets",
+    "\\src\\components",
+    "\\src\\data",
+    "\\src\\mock",
+    "\\src\\router",
+    "\\src\\stores",
+    "\\src\\styles",
+    "\\src\\views"
+  ],
+  "SelectedNode": "\\src\\views\\HomeView.vue",
+  "PreviewInSolutionExplorer": false
+}

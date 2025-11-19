@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.demo.app.mapper.UserRoleMapper">
+
+    <resultMap id="UserRoleResultMap" type="com.example.demo.app.entity.UserRole">
+        <id column="id" property="id" />
+        <result column="user_id" property="userId" />
+        <result column="role_id" property="roleId" />
+        <result column="assigned_by" property="assignedBy" />
+        <result column="assigned_at" property="assignedAt" />
+        <result column="expires_at" property="expiresAt" />
+        <result column="created_at" property="createdAt" />
+    </resultMap>
+
+    <insert id="insert" parameterType="com.example.demo.app.entity.UserRole"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO user_roles (
+            user_id, role_id, assigned_by, assigned_at, expires_at, created_at
+        ) VALUES (
+                     #{userId}, #{roleId}, #{assignedBy}, NOW(), #{expiresAt}, NOW()
+                 )
+    </insert>
+
+    <delete id="deleteByUserIdAndRoleId">
+        DELETE FROM user_roles
+        WHERE user_id = #{userId} AND role_id = #{roleId}
+    </delete>
+
+    <delete id="deleteByUserId">
+        DELETE FROM user_roles
+        WHERE user_id = #{userId}
+    </delete>
+
+    <select id="selectByUserId" resultMap="UserRoleResultMap">
+        SELECT id, user_id, role_id, assigned_by, assigned_at, expires_at, created_at
+        FROM user_roles
+        WHERE user_id = #{userId}
+          AND (expires_at IS NULL OR expires_at > NOW())
+    </select>
+
+    <select id="selectByUserIdAndRoleId" resultMap="UserRoleResultMap">
+        SELECT id, user_id, role_id, assigned_by, assigned_at, expires_at, created_at
+        FROM user_roles
+        WHERE user_id = #{userId} AND role_id = #{roleId}
+          AND (expires_at IS NULL OR expires_at > NOW())
+    </select>
+
+</mapper>

@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.demo.app.mapper.UserVerificationCodeMapper">
+
+    <resultMap id="UserVerificationCodeResultMap" type="com.example.demo.app.entity.UserVerificationCode">
+        <id column="id" property="id" />
+        <result column="user_id" property="userId" />
+        <result column="type" property="type" />
+        <result column="target" property="target" />
+        <result column="code" property="code" />
+        <result column="used" property="used" />
+        <result column="expires_at" property="expiresAt" />
+        <result column="created_at" property="createdAt" />
+    </resultMap>
+
+    <sql id="UserVerificationCode_Column_List">
+        id, user_id, type, target, code, used, expires_at, created_at
+    </sql>
+
+    <insert id="insert" parameterType="com.example.demo.app.entity.UserVerificationCode"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO user_verification_codes (
+            user_id, type, target, code, used, expires_at, created_at
+        ) VALUES (
+                     #{userId}, #{type}, #{target}, #{code}, #{used}, #{expiresAt}, NOW()
+                 )
+    </insert>
+
+    <select id="selectById" resultMap="UserVerificationCodeResultMap">
+        SELECT <include refid="UserVerificationCode_Column_List" />
+        FROM user_verification_codes
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectValidCode" resultMap="UserVerificationCodeResultMap">
+        SELECT <include refid="UserVerificationCode_Column_List" />
+        FROM user_verification_codes
+        WHERE target = #{target}
+        AND type = #{type}
+        AND code = #{code}
+        AND used = 0
+        AND expires_at > NOW()
+        ORDER BY created_at DESC
+        LIMIT 1
+    </select>
+
+    <select id="selectByTargetAndType" resultMap="UserVerificationCodeResultMap">
+        SELECT <include refid="UserVerificationCode_Column_List" />
+        FROM user_verification_codes
+        WHERE target = #{target} AND type = #{type}
+        ORDER BY created_at DESC
+    </select>
+
+    <update id="markAsUsed">
+        UPDATE user_verification_codes
+        SET used = 1
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteExpiredCodes">
+        DELETE FROM user_verification_codes
+        WHERE expires_at &lt;= #{currentTime}
+    </delete>
+
+    <select id="countRecentAttempts" resultType="int">
+        SELECT COUNT(*)
+        FROM user_verification_codes
+        WHERE target = #{target}
+          AND type = #{type}
+          AND created_at >= #{sinceTime}
+    </select>
+
+</mapper>
