@@ -125,15 +125,15 @@ log_warn "首次构建可能需要 5-10 分钟（下载依赖）"
 docker run --rm \
     --network=host \
     -v $MAVEN_CACHE_VOLUME:/root/.m2 \
-    -v "$PWD/../demo":/usr/src/app \
+    -v "$PWD/../backend":/usr/src/app \
     -w /usr/src/app \
     maven:3.9-eclipse-temurin-17 \
     mvn clean package -DskipTests -q
 
 # 检查 JAR 包是否生成
-if ls ../demo/target/*.jar 1> /dev/null 2>&1; then
+if ls ../backend/target/*.jar 1> /dev/null 2>&1; then
     log_info "后端 JAR 包构建成功 ✓"
-    ls -lh ../demo/target/*.jar
+    ls -lh ../backend/target/*.jar
 else
     log_error "后端 JAR 包构建失败"
     exit 1
@@ -186,7 +186,6 @@ echo "========================================"
 echo "✓ 部署成功！服务访问地址："
 echo "========================================"
 echo "前端管理端:  http://localhost"
-echo "前端移动端:  http://localhost:81"
 echo "后端 API:    http://localhost:8080"
 echo "API 文档:    http://localhost:8080/doc.html"
 echo "PHPMyAdmin:  http://localhost:8081"

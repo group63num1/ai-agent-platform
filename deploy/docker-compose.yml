@@ -47,7 +47,7 @@ services:
   backend:
     container_name: ${PROJECT_NAME:-ai-agent}-backend
     build:
-      context: ../demo
+      context: ../backend
       dockerfile: Dockerfile
     image: ${PROJECT_NAME:-health-agent}-backend:latest
     restart: unless-stopped
@@ -58,7 +58,7 @@ services:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
       
       # 数据库配置（连接 mysql 服务）
-      DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-health_agent_db}?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&characterEncoding=UTF-8
+      DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-demo_db}?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&characterEncoding=UTF-8
       DATASOURCE_USERNAME: root
       DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD:-123456}
       
@@ -80,7 +80,7 @@ services:
   web-admin:
     container_name: ${PROJECT_NAME:-ai-agent}-web-admin
     build:
-      context: ../vue3-001
+      context: ../frontend
       dockerfile: Dockerfile
       args:
         NODE_ENV: ${NODE_ENV:-production}
@@ -97,23 +97,24 @@ services:
 
 
   # ==================== 前端移动端服务 ====================
-  h5-mobile:
-    container_name: ${PROJECT_NAME:-ai-agent}-mobile
-    build:
-      context: ../mobile
-      dockerfile: Dockerfile
-      args:
-        NODE_ENV: ${NODE_ENV:-production}
-    image: ${PROJECT_NAME:-ai-agent}-mobile:latest
-    restart: unless-stopped
-    ports:
-      - "${H5_MOBILE_PORT:-81}:80"
-    environment:
-      TZ: ${TZ:-Asia/Shanghai}
-    networks:
-      - app-network
-    depends_on:
-      - backend  # ⭐ 等待后端服务启动（不要求健康检查）
+  # 已删除 mobile 文件夹，注释掉相关配置
+  # h5-mobile:
+  #   container_name: ${PROJECT_NAME:-ai-agent}-mobile
+  #   build:
+  #     context: ../mobile
+  #     dockerfile: Dockerfile
+  #     args:
+  #       NODE_ENV: ${NODE_ENV:-production}
+  #   image: ${PROJECT_NAME:-ai-agent}-mobile:latest
+  #   restart: unless-stopped
+  #   ports:
+  #     - "${H5_MOBILE_PORT:-81}:80"
+  #   environment:
+  #     TZ: ${TZ:-Asia/Shanghai}
+  #   networks:
+  #     - app-network
+  #   depends_on:
+  #     - backend  # ⭐ 等待后端服务启动（不要求健康检查）
 
 
 networks:
