@@ -132,13 +132,24 @@ const loadMenus = async () => {
   menuLoading.value = true
   try {
     const menus = await getMenus()
-    menuList.value = transformMenuData(menus)
+    const transformed = transformMenuData(menus)
+    // 插件管理菜单始终存在
+    const hasPluginMenu = transformed.some(item => item.path === '/home/plugins')
+    if (!hasPluginMenu) {
+      transformed.splice(1, 0, {
+        title: '插件管理',
+        path: '/home/plugins',
+        icon: iconMap.Setting
+      })
+    }
+    menuList.value = transformed
   } catch (error) {
     console.error('加载菜单失败:', error)
     ElMessage.error('加载菜单失败: ' + (error.message || '未知错误'))
     menuList.value = [
       { title: '首页', path: '/home', icon: iconMap.House },
       { title: '应用管理', path: '/home/apps', icon: iconMap.Grid },
+      { title: '插件管理', path: '/home/plugins', icon: iconMap.Setting },
       { title: '个人信息', path: '/home/profile', icon: iconMap.User }
     ]
   } finally {

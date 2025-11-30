@@ -120,6 +120,57 @@ INSERT INTO `chat_session` (`id`, `user_id`, `title`, `created_at`, `updated_at`
 (3, 12, '新对话', '2025-11-05 12:32:38', '2025-11-06 07:33:07', 0);
 
 -- --------------------------------------------------------
+--
+-- 表的结构 `plugins`
+--
+CREATE TABLE `plugins` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '插件ID',
+  `user_id` bigint DEFAULT NULL COMMENT '创建者ID',
+  `name` varchar(100) NOT NULL COMMENT '插件名称',
+  `intro` varchar(255) DEFAULT NULL COMMENT '一句话介绍',
+  `description` text COMMENT '插件描述',
+  `icon_url` varchar(500) DEFAULT NULL COMMENT '图标URL',
+  `plugin_type` varchar(20) DEFAULT 'cloud' COMMENT '类型：cloud/edge/mcp',
+  `create_mode` varchar(50) DEFAULT NULL COMMENT '创建方式',
+  `version` varchar(20) DEFAULT '1.0.0' COMMENT '版本',
+  `status` varchar(20) DEFAULT 'draft' COMMENT '状态：draft/enabled/disabled',
+  `publish_status` varchar(20) DEFAULT 'unpublished' COMMENT '发布状态',
+  `test_status` varchar(20) DEFAULT 'pending' COMMENT '试运行状态',
+  `enabled` tinyint(1) DEFAULT '0' COMMENT '是否启用',
+  `plugin_url` varchar(500) DEFAULT NULL COMMENT '服务URL',
+  `auth_type` varchar(50) DEFAULT NULL COMMENT '授权方式',
+  `headers_json` text COMMENT 'Header配置JSON',
+  `spec_json` longtext COMMENT '原始JSON模板',
+  `last_test_at` datetime DEFAULT NULL COMMENT '上次测试时间',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='插件表';
+
+-- --------------------------------------------------------
+--
+-- 表的结构 `plugin_tools`
+--
+CREATE TABLE `plugin_tools` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '工具ID',
+  `plugin_id` bigint NOT NULL COMMENT '插件ID',
+  `name` varchar(100) NOT NULL COMMENT '工具名称',
+  `description` text COMMENT '工具描述',
+  `method` varchar(16) DEFAULT 'GET' COMMENT '请求方法',
+  `endpoint` varchar(255) DEFAULT NULL COMMENT '请求路径',
+  `service_status` varchar(20) DEFAULT 'offline' COMMENT '服务状态',
+  `test_status` varchar(20) DEFAULT 'pending' COMMENT '测试状态',
+  `last_test_at` datetime DEFAULT NULL COMMENT '上次测试时间',
+  `input_params` text COMMENT '输入参数JSON',
+  `output_params` text COMMENT '输出参数JSON',
+  `request_example` text COMMENT '请求示例',
+  `response_example` text COMMENT '响应示例',
+  PRIMARY KEY (`id`),
+  KEY `idx_plugin_id` (`plugin_id`),
+  CONSTRAINT `fk_plugin_tools_plugin` FOREIGN KEY (`plugin_id`) REFERENCES `plugins` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='插件工具表';
+
+-- --------------------------------------------------------
 
 --
 -- 表的结构 `agents`

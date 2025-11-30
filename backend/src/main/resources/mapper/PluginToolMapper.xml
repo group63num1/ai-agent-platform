@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.demo.app.mapper.PluginToolMapper">
+
+    <resultMap id="PluginToolResultMap" type="com.example.demo.app.entity.PluginTool">
+        <id column="id" property="id"/>
+        <result column="plugin_id" property="pluginId"/>
+        <result column="name" property="name"/>
+        <result column="description" property="description"/>
+        <result column="method" property="method"/>
+        <result column="endpoint" property="endpoint"/>
+        <result column="service_status" property="serviceStatus"/>
+        <result column="test_status" property="testStatus"/>
+        <result column="last_test_at" property="lastTestAt"/>
+        <result column="input_params" property="inputParamsJson"/>
+        <result column="output_params" property="outputParamsJson"/>
+        <result column="request_example" property="requestExample"/>
+        <result column="response_example" property="responseExample"/>
+    </resultMap>
+
+    <sql id="PluginToolColumns">
+        id, plugin_id, name, description, method, endpoint, service_status,
+        test_status, last_test_at, input_params, output_params,
+        request_example, response_example
+    </sql>
+
+    <insert id="insert" parameterType="com.example.demo.app.entity.PluginTool" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO plugin_tools (
+            plugin_id, name, description, method, endpoint, service_status,
+            test_status, last_test_at, input_params, output_params,
+            request_example, response_example
+        ) VALUES (
+            #{pluginId}, #{name}, #{description}, #{method}, #{endpoint}, #{serviceStatus},
+            #{testStatus}, #{lastTestAt}, #{inputParamsJson}, #{outputParamsJson},
+            #{requestExample}, #{responseExample}
+        )
+    </insert>
+
+    <update id="update" parameterType="com.example.demo.app.entity.PluginTool">
+        UPDATE plugin_tools
+        <set>
+            <if test="name != null">name = #{name},</if>
+            <if test="description != null">description = #{description},</if>
+            <if test="method != null">method = #{method},</if>
+            <if test="endpoint != null">endpoint = #{endpoint},</if>
+            <if test="serviceStatus != null">service_status = #{serviceStatus},</if>
+            <if test="testStatus != null">test_status = #{testStatus},</if>
+            <if test="lastTestAt != null">last_test_at = #{lastTestAt},</if>
+            <if test="inputParamsJson != null">input_params = #{inputParamsJson},</if>
+            <if test="outputParamsJson != null">output_params = #{outputParamsJson},</if>
+            <if test="requestExample != null">request_example = #{requestExample},</if>
+            <if test="responseExample != null">response_example = #{responseExample},</if>
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectById" resultMap="PluginToolResultMap">
+        SELECT <include refid="PluginToolColumns"/>
+        FROM plugin_tools
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByPluginId" resultMap="PluginToolResultMap">
+        SELECT <include refid="PluginToolColumns"/>
+        FROM plugin_tools
+        WHERE plugin_id = #{pluginId}
+        ORDER BY id ASC
+    </select>
+
+    <delete id="deleteByPluginId">
+        DELETE FROM plugin_tools WHERE plugin_id = #{pluginId}
+    </delete>
+</mapper>
+

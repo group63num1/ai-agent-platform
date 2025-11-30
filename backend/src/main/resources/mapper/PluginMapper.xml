@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.demo.app.mapper.PluginMapper">
+
+    <resultMap id="PluginResultMap" type="com.example.demo.app.entity.Plugin">
+        <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
+        <result column="name" property="name"/>
+        <result column="intro" property="intro"/>
+        <result column="description" property="description"/>
+        <result column="icon_url" property="iconUrl"/>
+        <result column="plugin_type" property="pluginType"/>
+        <result column="create_mode" property="createMode"/>
+        <result column="version" property="version"/>
+        <result column="status" property="status"/>
+        <result column="publish_status" property="publishStatus"/>
+        <result column="test_status" property="testStatus"/>
+        <result column="enabled" property="enabled"/>
+        <result column="plugin_url" property="pluginUrl"/>
+        <result column="auth_type" property="authType"/>
+        <result column="headers_json" property="headersJson"/>
+        <result column="spec_json" property="specJson"/>
+        <result column="last_test_at" property="lastTestAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="PluginColumns">
+        id, user_id, name, intro, description, icon_url, plugin_type, create_mode,
+        version, status, publish_status, test_status, enabled, plugin_url, auth_type,
+        headers_json, spec_json, last_test_at, created_at, updated_at
+    </sql>
+
+    <insert id="insert" parameterType="com.example.demo.app.entity.Plugin" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO plugins (
+            user_id, name, intro, description, icon_url, plugin_type, create_mode,
+            version, status, publish_status, test_status, enabled, plugin_url,
+            auth_type, headers_json, spec_json, last_test_at, created_at, updated_at
+        ) VALUES (
+            #{userId}, #{name}, #{intro}, #{description}, #{iconUrl}, #{pluginType}, #{createMode},
+            #{version}, #{status}, #{publishStatus}, #{testStatus}, #{enabled}, #{pluginUrl},
+            #{authType}, #{headersJson}, #{specJson}, #{lastTestAt}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <update id="update" parameterType="com.example.demo.app.entity.Plugin">
+        UPDATE plugins
+        <set>
+            <if test="name != null">name = #{name},</if>
+            <if test="intro != null">intro = #{intro},</if>
+            <if test="description != null">description = #{description},</if>
+            <if test="iconUrl != null">icon_url = #{iconUrl},</if>
+            <if test="pluginType != null">plugin_type = #{pluginType},</if>
+            <if test="createMode != null">create_mode = #{createMode},</if>
+            <if test="version != null">version = #{version},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="publishStatus != null">publish_status = #{publishStatus},</if>
+            <if test="testStatus != null">test_status = #{testStatus},</if>
+            <if test="enabled != null">enabled = #{enabled},</if>
+            <if test="pluginUrl != null">plugin_url = #{pluginUrl},</if>
+            <if test="authType != null">auth_type = #{authType},</if>
+            <if test="headersJson != null">headers_json = #{headersJson},</if>
+            <if test="specJson != null">spec_json = #{specJson},</if>
+            <if test="lastTestAt != null">last_test_at = #{lastTestAt},</if>
+            updated_at = #{updatedAt}
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectById" resultMap="PluginResultMap">
+        SELECT <include refid="PluginColumns"/>
+        FROM plugins
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectAll" resultMap="PluginResultMap">
+        SELECT <include refid="PluginColumns"/>
+        FROM plugins
+        ORDER BY updated_at DESC
+    </select>
+
+    <delete id="delete">
+        DELETE FROM plugins WHERE id = #{id}
+    </delete>
+
+</mapper>
+
