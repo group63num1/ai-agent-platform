@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.demo.app.mapper.AgentMapper">
+
+    <resultMap id="AgentResultMap" type="com.example.demo.app.entity.Agent">
+        <id column="id" property="id"/>
+        <result column="name" property="name"/>
+        <result column="description" property="description"/>
+        <result column="model" property="model"/>
+        <result column="prompt" property="prompt"/>
+        <result column="profile_md" property="profileMd"/>
+        <result column="context_rounds" property="contextRounds"/>
+        <result column="max_tokens" property="maxTokens"/>
+        <result column="plugins" property="plugins"/>
+        <result column="status" property="status"/>
+        <result column="session_id" property="sessionId"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="AgentColumns">
+        id, name, description, model, prompt, profile_md, context_rounds,
+        max_tokens, plugins, status, session_id, created_at, updated_at
+    </sql>
+
+    <insert id="insert" parameterType="com.example.demo.app.entity.Agent">
+        INSERT INTO agents (
+            id, name, description, model, prompt, profile_md, context_rounds,
+            max_tokens, plugins, status, session_id, created_at, updated_at
+        ) VALUES (
+            #{id}, #{name}, #{description}, #{model}, #{prompt}, #{profileMd},
+            #{contextRounds}, #{maxTokens}, #{plugins}, #{status}, #{sessionId},
+            #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="selectById" resultMap="AgentResultMap">
+        SELECT <include refid="AgentColumns"/>
+        FROM agents
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByName" resultMap="AgentResultMap">
+        SELECT <include refid="AgentColumns"/>
+        FROM agents
+        WHERE name = #{name}
+    </select>
+
+    <select id="selectPage" resultMap="AgentResultMap">
+        SELECT <include refid="AgentColumns"/>
+        FROM agents
+        <where>
+            <if test="keyword != null and keyword != ''">
+                (name LIKE CONCAT('%', #{keyword}, '%')
+                    OR description LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+        </where>
+        ORDER BY updated_at DESC
+        LIMIT #{pageSize} OFFSET #{offset}
+    </select>
+
+    <select id="countByKeyword" resultType="long">
+        SELECT COUNT(1)
+        FROM agents
+        <where>
+            <if test="keyword != null and keyword != ''">
+                (name LIKE CONCAT('%', #{keyword}, '%')
+                    OR description LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+        </where>
+    </select>
+
+    <update id="update" parameterType="com.example.demo.app.entity.Agent">
+        UPDATE agents
+        <set>
+            <if test="name != null">name = #{name},</if>
+            <if test="description != null">description = #{description},</if>
+            <if test="model != null">model = #{model},</if>
+            <if test="prompt != null">prompt = #{prompt},</if>
+            <if test="profileMd != null">profile_md = #{profileMd},</if>
+            <if test="contextRounds != null">context_rounds = #{contextRounds},</if>
+            <if test="maxTokens != null">max_tokens = #{maxTokens},</if>
+            <if test="plugins != null">plugins = #{plugins},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="sessionId != null">session_id = #{sessionId},</if>
+            <if test="updatedAt != null">updated_at = #{updatedAt},</if>
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <delete id="delete">
+        DELETE FROM agents WHERE id = #{id}
+    </delete>
+
+    <update id="updateStatus">
+        UPDATE agents SET status = #{status}, updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+</mapper>
+
+
