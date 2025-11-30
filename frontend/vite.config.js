@@ -17,6 +17,7 @@ export default defineConfig({
   },
   server: {
     proxy: {
+      // 所有 `/api` 请求直接代理到真实后端（已移除本地 mock 专用映射）
       '/api': {
         target: 'http://localhost:28080',
         changeOrigin: true,

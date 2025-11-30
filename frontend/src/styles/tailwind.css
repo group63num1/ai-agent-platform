@@ -1,1 +1,40 @@
 @import "tailwindcss";
+
+/* Base typography and smoothing */
+@layer base {
+	html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+	body { color: #0f172a; }
+}
+
+/* Card aesthetics similar to modern AI platforms */
+.el-card {
+	border-radius: 16px !important;
+	border-color: rgba(2, 6, 23, 0.06) !important;
+	box-shadow: 0 8px 24px rgba(2, 6, 23, 0.04) !important;
+	transition: transform .2s ease, box-shadow .2s ease !important;
+}
+.el-card:hover {
+	transform: translateY(-2px);
+	box-shadow: 0 16px 32px rgba(2, 6, 23, 0.08) !important;
+}
+
+/* Subtle gradient primary buttons */
+.el-button.el-button--primary {
+	background-image: linear-gradient(135deg, #6366f1, #22d3ee) !important;
+	border: none !important;
+}
+.el-button.el-button--primary.is-plain {
+	background-image: none !important;
+}
+
+/* Tag colors a bit softer */
+.el-tag.el-tag--success {
+	background: linear-gradient(135deg, #d1fae5, #a7f3d0) !important;
+	border: none !important;
+	color: #065f46 !important;
+}
+.el-tag.el-tag--info {
+	background: linear-gradient(135deg, #e5e7eb, #f3f4f6) !important;
+	border: none !important;
+	color: #374151 !important;
+}
