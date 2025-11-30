@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.demo.app.mapper.AgentMessageMapper">
+
+    <resultMap id="AgentMessageResultMap" type="com.example.demo.app.entity.AgentMessage">
+        <id column="id" property="id"/>
+        <result column="agent_id" property="agentId"/>
+        <result column="session_id" property="sessionId"/>
+        <result column="role" property="role"/>
+        <result column="content" property="content"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <sql id="AgentMessageColumns">
+        id, agent_id, session_id, role, content, created_at
+    </sql>
+
+    <insert id="insert" parameterType="com.example.demo.app.entity.AgentMessage"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO agent_messages (
+            agent_id, session_id, role, content, created_at
+        ) VALUES (
+            #{agentId}, #{sessionId}, #{role}, #{content}, #{createdAt}
+        )
+    </insert>
+
+    <select id="selectRecentMessages" resultMap="AgentMessageResultMap">
+        SELECT <include refid="AgentMessageColumns"/>
+        FROM agent_messages
+        WHERE agent_id = #{agentId}
+          AND session_id = #{sessionId}
+        ORDER BY created_at DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectLatestMessages" resultMap="AgentMessageResultMap">
+        SELECT <include refid="AgentMessageColumns"/>
+        FROM agent_messages
+        WHERE agent_id = #{agentId}
+        ORDER BY created_at DESC
+        LIMIT #{limit}
+    </select>
+
+</mapper>
+
+
