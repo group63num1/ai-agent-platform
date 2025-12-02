@@ -1,32 +1,31 @@
-# FastAPI 和 Web 服务器
+# FastAPI 和 Web 服务器（只固定关键版本，其他交给 pip 自动选兼容版本）
 fastapi==0.115.0
 uvicorn[standard]==0.32.0
-python-dotenv==1.0.1
-pydantic==2.9.2
+python-dotenv
+pydantic
 
-# 数据库相关
-sqlalchemy==2.0.35
-pymysql==1.1.1
-cryptography==43.0.1
+# 数据库相关（不固定精确版本，避免与 langchain 冲突）
+sqlalchemy
+pymysql
+cryptography
 
-# LangChain 相关
-langchain==0.3.7
-langchain-core==0.3.15
-langchain-community==0.3.7
-langchain-text-splitters==0.3.4
+# LangChain 相关（不锁死版本，让 langchain 一家自己解依赖）
+langchain
+langchain-core
+langchain-community
+langchain-text-splitters
 
 # 向量数据库和嵌入
-faiss-cpu==1.8.0.post1
-sentence-transformers==3.0.1
+faiss-cpu
+sentence-transformers
 
 # HTTP 请求
-requests==2.32.3
-httpx==0.27.2
+requests
+httpx
 
 # 工具和工具类
-openapi-spec-validator==0.7.1
-pyyaml==6.0.2
+openapi-spec-validator
+pyyaml
 
 # 日志和工具
-python-multipart==0.0.12
-
+python-multipart
