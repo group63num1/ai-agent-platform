@@ -27,3 +27,16 @@ npm run dev
 ```sh
 npm run build
 ```
+
+### 后端集成
+
+当前仓库已移除本地 `mock-server` 的强制使用；前端现在直接请求真实后端（路径 `/api/*`）。
+
+开发运行：
+
+```sh
+npm install
+npm run dev
+```
+
+如果需要本地模拟测试与历史实现保持兼容，请参阅 `AGENTS_API.md` 中的接口说明来自行搭建或与后端对接。

@@ -7,9 +7,9 @@ spring:
 
   datasource:
     # ⭐ 默认值为 localhost（本地开发），Docker 中通过环境变量覆盖
-    url: ${DATASOURCE_URL:jdbc:mysql://localhost:3306/your_database?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf8&allowPublicKeyRetrieval=true}
-    username: ${DATASOURCE_USERNAME:your_username}
-    password: ${DATASOURCE_PASSWORD:your_password}
+    url: ${DATASOURCE_URL:jdbc:mysql://localhost:3306/demo_db?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf8&allowPublicKeyRetrieval=true}
+    username: demo_user
+    password: demo_pass_123
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       minimum-idle: 5
@@ -96,7 +96,7 @@ knife4j:
 
 # LLM API配置
 llm:
-  provider: ${LLM_PROVIDER:tencent}  # 提供商：tencent(腾讯云) 或 openai
+  provider: ${LLM_PROVIDER:hunyuan}  # 默认使用混元，可选：hunyuan / qianwen / doubao / deepseek
   api-key: ${LLM_API_KEY:AKIDpkeRgsxvjNvKZfcKtJas12udFh09B3lK:WuEQSOCrNk07EE4lJi2CDCmDVdcS8sUx}
   api-url: ${LLM_API_URL:https://hunyuan.tencentcloudapi.com}
   model: ${LLM_MODEL:hunyuan-lite}
@@ -106,3 +106,28 @@ llm:
   chat:
     system-prompt: "你是一个专业的智能客服助手，能够准确理解用户的问题并提供有帮助的回答。请用友好、专业、简洁的方式回答问题。如果用户提到之前对话的内容，请根据上下文进行回答。"
     max-history: 30
+  providers:
+    qianwen:
+      api-url: ${LLM_QIANWEN_API_URL:https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions}
+      api-key: ${LLM_QIANWEN_API_KEY:}
+      model: ${LLM_QIANWEN_MODEL:qwen-max}
+      max-tokens: 1024
+      temperature: 0.7
+    doubao:
+      api-url: ${LLM_DOUBAO_API_URL:https://ark.cn-beijing.volces.com/api/v3/chat/completions}
+      api-key: ${LLM_DOUBAO_API_KEY:}
+      model: ${LLM_DOUBAO_MODEL:doubao-pro-4k}
+      max-tokens: 1024
+      temperature: 0.7
+    deepseek:
+      api-url: ${LLM_DEEPSEEK_API_URL:https://api.deepseek.com/v1/chat/completions}
+      api-key: ${LLM_DEEPSEEK_API_KEY:}
+      model: ${LLM_DEEPSEEK_MODEL:deepseek-chat}
+      max-tokens: 2048
+      temperature: 0.7
+    hunyuan:
+      api-url: ${LLM_HUNYUAN_API_URL:https://hunyuan.tencentcloudapi.com}
+      api-key: ${LLM_HUNYUAN_API_KEY:${LLM_API_KEY:}}
+      model: ${LLM_HUNYUAN_MODEL:hunyuan-lite}
+      max-tokens: 1000
+      temperature: 0.7

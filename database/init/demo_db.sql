@@ -122,6 +122,41 @@ INSERT INTO `chat_session` (`id`, `user_id`, `title`, `created_at`, `updated_at`
 -- --------------------------------------------------------
 
 --
+-- 表的结构 `agents`
+--
+
+CREATE TABLE `agents` (
+  `id` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '智能体ID',
+  `name` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '智能体名称',
+  `description` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '简介',
+  `model` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'gpt-4o-mini' COMMENT '默认模型',
+  `prompt` text COLLATE utf8mb4_unicode_ci COMMENT '提示词',
+  `profile_md` text COLLATE utf8mb4_unicode_ci COMMENT 'Markdown人设',
+  `context_rounds` int DEFAULT '3' COMMENT '上下文轮次',
+  `max_tokens` int DEFAULT '512' COMMENT '最大输出token',
+  `plugins` json DEFAULT NULL COMMENT '插件配置',
+  `status` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft' COMMENT '状态',
+  `session_id` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '默认会话ID',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='智能体配置表';
+
+--
+-- 表的结构 `agent_messages`
+--
+
+CREATE TABLE `agent_messages` (
+  `id` bigint NOT NULL COMMENT '消息ID',
+  `agent_id` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '智能体ID',
+  `session_id` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '会话ID',
+  `role` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '角色',
+  `content` text COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '消息内容',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='智能体对话消息表';
+
+-- --------------------------------------------------------
+
+--
 -- 表的结构 `knowledge_chunk`
 --
 
@@ -869,6 +904,23 @@ ALTER TABLE `chat_message`
   ADD KEY `idx_session` (`session_id`);
 
 --
+-- 表的索引 `agents`
+--
+ALTER TABLE `agents`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `ux_agents_name` (`name`),
+  ADD KEY `idx_agents_status` (`status`),
+  ADD KEY `idx_agents_updated_at` (`updated_at`);
+
+--
+-- 表的索引 `agent_messages`
+--
+ALTER TABLE `agent_messages`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_agent_messages_agent_session` (`agent_id`,`session_id`),
+  ADD KEY `idx_agent_messages_created_at` (`created_at`);
+
+--
 -- 表的索引 `chat_session`
 --
 ALTER TABLE `chat_session`
@@ -1117,6 +1169,12 @@ ALTER TABLE `chat_session`
   MODIFY `id` bigint NOT NULL AUTO_INCREMENT COMMENT '会话ID', AUTO_INCREMENT=4;
 
 --
+-- 使用表AUTO_INCREMENT `agent_messages`
+--
+ALTER TABLE `agent_messages`
+  MODIFY `id` bigint NOT NULL AUTO_INCREMENT COMMENT '消息ID';
+
+--
 -- 使用表AUTO_INCREMENT `knowledge_chunk`
 --
 ALTER TABLE `knowledge_chunk`
@@ -1251,6 +1309,12 @@ ALTER TABLE `user_verification_codes`
 --
 ALTER TABLE `knowledge_chunk`
   ADD CONSTRAINT `knowledge_chunk_ibfk_1` FOREIGN KEY (`document_id`) REFERENCES `knowledge_document` (`id`) ON DELETE CASCADE;
+
+--
+-- 限制表 `agent_messages`
+--
+ALTER TABLE `agent_messages`
+  ADD CONSTRAINT `fk_agent_messages_agent` FOREIGN KEY (`agent_id`) REFERENCES `agents` (`id`) ON DELETE CASCADE;
 
 --
 -- 限制表 `knowledge_chunk_embedding`

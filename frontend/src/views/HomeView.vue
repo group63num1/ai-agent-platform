@@ -133,12 +133,18 @@ const loadMenus = async () => {
   try {
     const menus = await getMenus()
     menuList.value = transformMenuData(menus)
+    // 确保包含智能体管理菜单（后端未返回时补充）
+    const hasAgents = menuList.value.some(m => m.path === '/home/agents')
+    if (!hasAgents) {
+      menuList.value.push({ title: '智能体管理', path: '/home/agents', icon: iconMap.Grid })
+    }
   } catch (error) {
     console.error('加载菜单失败:', error)
     ElMessage.error('加载菜单失败: ' + (error.message || '未知错误'))
     menuList.value = [
       { title: '首页', path: '/home', icon: iconMap.House },
       { title: '应用管理', path: '/home/apps', icon: iconMap.Grid },
+      { title: '智能体管理', path: '/home/agents', icon: iconMap.Grid },
       { title: '个人信息', path: '/home/profile', icon: iconMap.User }
     ]
   } finally {
