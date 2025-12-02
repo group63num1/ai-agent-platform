@@ -126,10 +126,11 @@ async def health_check():
     """健康检查"""
     try:
         from core.database import get_session
+        from sqlalchemy import text
 
         # 测试数据库连接
         with get_session() as session:
-            session.execute("SELECT 1")
+            session.execute(text("SELECT 1"))
         db_status = "connected"
     except Exception as e:
         logger.error(f"数据库连接检查失败: {e}")

@@ -76,6 +76,75 @@ services:
         condition: service_healthy
     # ⚠️ 不配置 healthcheck（除非项目有 Actuator)
 
+  # ==================== AI Agent 服务 ====================
+  ai-agent:
+    container_name: ${PROJECT_NAME:-ai-agent}-ai-agent
+    build:
+      context: ../ai-agent
+      dockerfile: Dockerfile
+    image: ${PROJECT_NAME:-ai-agent}-ai-agent:latest
+    restart: unless-stopped
+    ports:
+      - "${AI_AGENT_PORT:-8000}:8000"
+    environment:
+      # 服务配置
+      HOST: 0.0.0.0
+      PORT: 8000
+      DEBUG: ${AI_AGENT_DEBUG:-false}
+      LOG_LEVEL: ${AI_AGENT_LOG_LEVEL:-INFO}
+      
+      # 数据库配置（连接 mysql 服务）
+      DATABASE_TYPE: mysql
+      DATABASE_HOST: mysql
+      DATABASE_PORT: 3306
+      DATABASE_USER: root
+      DATABASE_PASSWORD: ${MYSQL_ROOT_PASSWORD:-123456}
+      DATABASE_NAME: ${MYSQL_DATABASE:-demo_db}
+      DATABASE_POOL_SIZE: ${AI_AGENT_DB_POOL_SIZE:-5}
+      DATABASE_MAX_OVERFLOW: ${AI_AGENT_DB_MAX_OVERFLOW:-10}
+      
+      # Java 后端配置
+      JAVA_BACKEND_URL: http://backend:28080
+      JAVA_BACKEND_TIMEOUT: ${AI_AGENT_BACKEND_TIMEOUT:-30}
+      
+      # RAG 配置
+      CORPUS_PATH: /app/corpus
+      CHUNK_SIZE: ${AI_AGENT_CHUNK_SIZE:-1000}
+      CHUNK_OVERLAP: ${AI_AGENT_CHUNK_OVERLAP:-200}
+      RETRIEVAL_K: ${AI_AGENT_RETRIEVAL_K:-3}
+      
+      # Agent 配置
+      MAX_ITERATIONS: ${AI_AGENT_MAX_ITERATIONS:-5}
+      MAX_HISTORY_LENGTH: ${AI_AGENT_MAX_HISTORY_LENGTH:-20}
+      SUMMARY_TRIGGER: ${AI_AGENT_SUMMARY_TRIGGER:-16}
+      VERBOSE: ${AI_AGENT_VERBOSE:-true}
+      
+      # 插件配置
+      PLUGIN_TIMEOUT: ${AI_AGENT_PLUGIN_TIMEOUT:-30}
+      PLUGIN_MAX_RETRIES: ${AI_AGENT_PLUGIN_MAX_RETRIES:-3}
+      
+      # CORS 配置
+      CORS_ORIGINS: ${AI_AGENT_CORS_ORIGINS:-*}
+      
+      # 时区
+      TZ: ${TZ:-Asia/Shanghai}
+    volumes:
+      - ai-agent-data:/app/data
+      - ai-agent-logs:/app/logs
+    networks:
+      - app-network
+    depends_on:
+      mysql:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
   # ==================== 前端管理端服务 ====================
   web-admin:
     container_name: ${PROJECT_NAME:-ai-agent}-web-admin
@@ -128,3 +197,9 @@ volumes:
   mysql-data:
     driver: local
     name: ${PROJECT_NAME:-ai-agent}-mysql-data
+  ai-agent-data:
+    driver: local
+    name: ${PROJECT_NAME:-ai-agent}-ai-agent-data
+  ai-agent-logs:
+    driver: local
+    name: ${PROJECT_NAME:-ai-agent}-ai-agent-logs

@@ -48,6 +48,7 @@ cleanup_containers() {
         "ai-agent-mysql"
         "ai-agent-backend" 
         "ai-agent-web-admin"
+        "ai-agent-ai-agent"
         "ai-agent-mobile"
         "ai-agent-phpmyadmin"
     )
@@ -113,7 +114,7 @@ if docker volume inspect $MAVEN_CACHE_VOLUME &> /dev/null; then
     log_info "Maven 缓存卷已存在: $MAVEN_CACHE_VOLUME"
 else
     log_info "创建 Maven 缓存卷: $MAVEN_CACHE_VOLUME"
-    docker volume create --name $MAVEN_CACHE_VOLUME
+    docker volume create $MAVEN_CACHE_VOLUME
 fi
 
 # ==================== 3. 容器化构建后端 JAR 包 ====================
@@ -144,6 +145,7 @@ log_step "4. 构建 Docker 镜像"
 
 log_info "开始构建所有服务的 Docker 镜像..."
 log_warn "前端构建可能需要 5-10 分钟（下载 npm 依赖）"
+log_warn "AI Agent 构建可能需要 5-10 分钟（下载 Python 依赖）"
 
 # 构建时不使用缓存，确保获取最新代码
 docker-compose build --no-cache
@@ -188,6 +190,8 @@ echo "========================================"
 echo "前端管理端:  http://localhost"
 echo "后端 API:    http://localhost:8080"
 echo "API 文档:    http://localhost:8080/doc.html"
+echo "AI Agent:    http://localhost:8000"
+echo "AI 文档:     http://localhost:8000/docs"
 echo "PHPMyAdmin:  http://localhost:8081"
 echo "========================================"
 echo -e "${NC}"

@@ -1,0 +1,32 @@
+# FastAPI 和 Web 服务器
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+python-dotenv==1.0.1
+pydantic==2.9.2
+
+# 数据库相关
+sqlalchemy==2.0.36
+pymysql==1.1.1
+cryptography==43.0.1
+
+# LangChain 相关
+langchain==0.3.7
+langchain-core==0.3.15
+langchain-community==0.3.7
+langchain-text-splitters==0.3.4
+
+# 向量数据库和嵌入
+faiss-cpu==1.8.0.post1
+sentence-transformers==3.0.1
+
+# HTTP 请求
+requests==2.32.3
+httpx==0.27.2
+
+# 工具和工具类
+openapi-spec-validator==0.7.1
+pyyaml==6.0.2
+
+# 日志和工具
+python-multipart==0.0.12
+
