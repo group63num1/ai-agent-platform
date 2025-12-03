@@ -131,8 +131,9 @@ const transformMenuData = (menus) => {
 const loadMenus = async () => {
   menuLoading.value = true
   try {
-    const menus = await getMenus()
-    const transformed = transformMenuData(menus)
+    const menus = await getMenus();
+    const transformed = transformMenuData(menus);
+
     // 插件管理菜单始终存在
     const hasPluginMenu = transformed.some(item => item.path === '/home/plugins');
     if (!hasPluginMenu) {
@@ -154,6 +155,18 @@ const loadMenus = async () => {
     }
 
     menuList.value = transformed;
+  } catch (error) {
+    console.error('加载菜单失败:', error)
+    ElMessage.error('加载菜单失败: ' + (error.message || '未知错误'))
+    menuList.value = [
+      { title: '首页', path: '/home', icon: iconMap.House },
+      { title: '应用管理', path: '/home/apps', icon: iconMap.Grid },
+      { title: '智能体管理', path: '/home/agents', icon: iconMap.Grid },
+      { title: '个人信息', path: '/home/profile', icon: iconMap.User }
+    ]
+  } finally {
+    menuLoading.value = false
+  }
 }
 
 const handleMenuClick = (menu) => {
