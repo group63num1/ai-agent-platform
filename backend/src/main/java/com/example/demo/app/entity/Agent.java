@@ -14,7 +14,7 @@ public class Agent {
     private String profileMd;
     private Integer contextRounds;
     private Integer maxTokens;
-    private String plugins; // JSON数组字符串
+    private String plugins; // JSON array string
     private String status;
     private String sessionId;
     private LocalDateTime createdAt;

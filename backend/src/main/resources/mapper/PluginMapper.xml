@@ -80,6 +80,12 @@
         ORDER BY updated_at DESC
     </select>
 
+    <select id="selectPublishedNames" resultType="java.lang.String">
+        SELECT name FROM plugins
+        WHERE publish_status = 'published'
+        ORDER BY updated_at DESC
+    </select>
+
     <delete id="delete">
         DELETE FROM plugins WHERE id = #{id}
     </delete>

@@ -17,6 +17,11 @@ public interface PluginMapper {
     List<Plugin> selectAll();
 
     int delete(@Param("id") Long id);
+
+    List<String> selectPublishedNames();
 }
+
+
+
 
 

@@ -9,11 +9,17 @@ import com.example.demo.service.PluginService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
@@ -36,7 +42,7 @@ public class PluginServiceImpl implements PluginService {
     private PluginToolMapper pluginToolMapper;
 
     @Autowired
-    private PythonAgentClient pythonAgentClient;
+    private org.springframework.web.client.RestTemplate restTemplate;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -128,7 +134,8 @@ public class PluginServiceImpl implements PluginService {
         if (tool == null || !Objects.equals(tool.getPluginId(), plugin.getId())) {
             throw new RuntimeException("工具不存在");
         }
-        PluginTestResultDTO result = pythonAgentClient.testPluginTool(plugin, tool, request.getInputs());
+        Map<String, Object> inputs = request.getInputs() != null ? request.getInputs() : Collections.emptyMap();
+        PluginTestResultDTO result = executePluginRequest(plugin, tool, inputs);
         if (result.isSuccess()) {
             tool.setTestStatus("passed");
             plugin.setTestStatus("passed");
@@ -190,6 +197,142 @@ public class PluginServiceImpl implements PluginService {
         } catch (IOException e) {
             throw new RuntimeException("解析插件模板失败: " + e.getMessage(), e);
         }
+    }
+
+    private PluginTestResultDTO executePluginRequest(Plugin plugin, PluginTool tool, Map<String, Object> inputs) {
+        PluginTestResultDTO result = new PluginTestResultDTO();
+        JsonNode specRoot = parseSpec(plugin);
+        try {
+            String baseUrl = resolveBaseUrl(plugin, specRoot);
+            String endpoint = resolveEndpoint(plugin, tool, specRoot);
+            String method = resolveMethod(tool, specRoot, endpoint);
+            if (StringUtils.isBlank(baseUrl) || StringUtils.isBlank(endpoint) || StringUtils.isBlank(method)) {
+                throw new RuntimeException("插件URL或请求方式配置不完整");
+            }
+            String fullUrl = buildUrl(baseUrl, endpoint);
+
+            HttpHeaders headers = new HttpHeaders();
+            for (PluginHeaderDTO header : readHeaders(plugin.getHeadersJson())) {
+                if (StringUtils.isNotBlank(header.getKey())) {
+                    headers.add(header.getKey(), header.getValue());
+                }
+            }
+
+            ResponseEntity<String> response;
+            if ("GET".equalsIgnoreCase(method)) {
+                UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(fullUrl);
+                inputs.forEach((key, value) -> builder.queryParam(key, value));
+                response = restTemplate.exchange(builder.build(true).toUri(), HttpMethod.GET, new HttpEntity<>(headers), String.class);
+            } else {
+                HttpEntity<Map<String, Object>> entity = new HttpEntity<>(inputs, headers);
+                response = restTemplate.exchange(fullUrl, HttpMethod.valueOf(method.toUpperCase(Locale.ROOT)), entity, String.class);
+            }
+
+            if (response.getStatusCode().is2xxSuccessful()) {
+                result.setSuccess(true);
+                result.setMessage("请求成功");
+                result.setResponse(response.getBody());
+            } else {
+                result.setSuccess(false);
+                result.setMessage("目标服务返回状态码：" + response.getStatusCode());
+                result.setResponse(response.getBody());
+            }
+        } catch (Exception e) {
+            result.setSuccess(false);
+            result.setMessage("目标服务调用失败: " + e.getMessage());
+            result.setResponse(null);
+        }
+        return result;
+    }
+
+    private JsonNode parseSpec(Plugin plugin) {
+        if (StringUtils.isBlank(plugin.getSpecJson())) {
+            return null;
+        }
+        try {
+            return objectMapper.readTree(plugin.getSpecJson());
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private String resolveBaseUrl(Plugin plugin, JsonNode specRoot) {
+        if (StringUtils.isNotBlank(plugin.getPluginUrl())) {
+            return plugin.getPluginUrl();
+        }
+        if (specRoot != null) {
+            JsonNode servers = specRoot.path("servers");
+            if (servers.isArray() && servers.size() > 0) {
+                String url = servers.get(0).path("url").asText("");
+                if (StringUtils.isNotBlank(url)) {
+                    return url;
+                }
+            }
+        }
+        return null;
+    }
+
+    private String resolveEndpoint(Plugin plugin, PluginTool tool, JsonNode specRoot) {
+        if (StringUtils.isNotBlank(tool.getEndpoint())) {
+            return tool.getEndpoint();
+        }
+        JsonNode pathNode = findPathNode(specRoot, null);
+        if (pathNode != null) {
+            return pathNode.path("_endpoint").asText("");
+        }
+        return null;
+    }
+
+    private String resolveMethod(PluginTool tool, JsonNode specRoot, String endpoint) {
+        if (StringUtils.isNotBlank(tool.getMethod())) {
+            return tool.getMethod();
+        }
+        JsonNode pathNode = findPathNode(specRoot, endpoint);
+        if (pathNode != null && pathNode.has("_method")) {
+            return pathNode.get("_method").asText("POST");
+        }
+        return "POST";
+    }
+
+    private JsonNode findPathNode(JsonNode specRoot, String endpoint) {
+        if (specRoot == null) {
+            return null;
+        }
+        JsonNode paths = specRoot.path("paths");
+        if (!paths.isObject()) {
+            return null;
+        }
+        if (StringUtils.isNotBlank(endpoint) && paths.has(endpoint)) {
+            JsonNode node = paths.get(endpoint);
+            enrichPathMetadata(node, endpoint);
+            return node;
+        }
+        Iterator<String> it = paths.fieldNames();
+        if (it.hasNext()) {
+            String first = it.next();
+            JsonNode node = paths.get(first);
+            enrichPathMetadata(node, first);
+            return node;
+        }
+        return null;
+    }
+
+    private void enrichPathMetadata(JsonNode pathNode, String endpoint) {
+        if (pathNode == null || !(pathNode.isObject())) {
+            return;
+        }
+        Iterator<String> methods = pathNode.fieldNames();
+        if (methods.hasNext()) {
+            String method = methods.next();
+            ((com.fasterxml.jackson.databind.node.ObjectNode) pathNode).put("_method", method.toUpperCase(Locale.ROOT));
+            ((com.fasterxml.jackson.databind.node.ObjectNode) pathNode).put("_endpoint", endpoint);
+        }
+    }
+
+    private String buildUrl(String baseUrl, String endpoint) {
+        String normalizedBase = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+        String normalizedEndpoint = endpoint.startsWith("/") ? endpoint : "/" + endpoint;
+        return normalizedBase + normalizedEndpoint;
     }
 
     private List<PluginParamDTO> parseParameters(JsonNode methodNode) {
@@ -396,6 +539,11 @@ public class PluginServiceImpl implements PluginService {
             throw new RuntimeException("插件不存在");
         }
         return plugin;
+    }
+
+    @Override
+    public List<String> listPublishedNames() {
+        return pluginMapper.selectPublishedNames();
     }
 }
 

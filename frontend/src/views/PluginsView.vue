@@ -594,10 +594,38 @@ const submitTest = async () => {
   if (!detailDrawer.data || !testDialog.tool) return
   testDialog.loading = true
   try {
+    // 深拷贝一份 inputs，并把 object 类型的参数转换为真正的 JSON 对象
+    let clone
+    if (typeof structuredClone === 'function') {
+      try {
+        clone = structuredClone(testDialog.form || {})
+      } catch (err) {
+        clone = JSON.parse(JSON.stringify(testDialog.form || {}))
+      }
+    } else {
+      clone = JSON.parse(JSON.stringify(testDialog.form || {}))
+    }
+
+    ;(testDialog.tool.inputParams || []).forEach((param) => {
+      const name = param.name
+      const val = clone[name]
+      if (param?.type === 'object') {
+        if (val === '' || val == null) {
+          clone[name] = {}
+        } else if (typeof val === 'string') {
+          try {
+            clone[name] = JSON.parse(val)
+          } catch (e) {
+            throw new Error(`参数 ${name} 需要 JSON 格式，请检查输入`)
+          }
+        }
+      }
+    })
+
     const payload = {
       pluginId: detailDrawer.data.id,
       toolId: testDialog.tool.id,
-      inputs: testDialog.form
+      inputs: clone
     }
     const result = await testPlugin(payload)
     if (result.success) {

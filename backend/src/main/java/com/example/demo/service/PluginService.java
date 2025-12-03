@@ -23,6 +23,11 @@ public interface PluginService {
     PluginTestResultDTO testPluginTool(PluginTestRequest request);
 
     PluginTemplateDTO importTemplate(MultipartFile file);
+
+    List<String> listPublishedNames();
 }
+
+
+
 
 
