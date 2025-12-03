@@ -149,6 +149,7 @@ const loadMenus = async () => {
     menuList.value = [
       { title: '首页', path: '/home', icon: iconMap.House },
       { title: '应用管理', path: '/home/apps', icon: iconMap.Grid },
+      { title: '智能体管理',path:'/home/agents',icon:iconMap.Grid },
       { title: '插件管理', path: '/home/plugins', icon: iconMap.Setting },
       { title: '个人信息', path: '/home/profile', icon: iconMap.User }
     ]
