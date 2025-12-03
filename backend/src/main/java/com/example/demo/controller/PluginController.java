@@ -63,6 +63,14 @@ public class PluginController {
     public ApiResponse<PluginTemplateDTO> importTemplate(@RequestParam("file") MultipartFile file) {
         return ApiResponse.ok(pluginService.importTemplate(file));
     }
+
+    @GetMapping("/getlist")
+    public ApiResponse<List<String>> listPublishedNames() {
+        return ApiResponse.ok(pluginService.listPublishedNames());
+    }
 }
+
+
+
 
 
