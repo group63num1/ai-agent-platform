@@ -39,4 +39,22 @@ export function importPluginTemplate(file) {
     headers: { 'Content-Type': 'multipart/form-data' }
   })
 }
+/**
+ * 获取插件列表
+ * 兼容返回数组或 { items: [] }
+ * @returns {Promise<Array>} [{ label, value }]
+ */
+export async function getPlugins() {
+  const data = await http.get('/plugins/getlist')
+  const list = Array.isArray(data) ? data : (data?.items || [])
+  // 兼容字符串数组或对象数组
+  return list.map(item => {
+    if (typeof item === 'string') {
+      return { label: item, value: item }
+    }
+    const label = item.label || item.name || item.id || '插件'
+    const value = item.value || item.key || item.name || item.id || label
+    return { label, value, raw: item }
+  })
+}
 
