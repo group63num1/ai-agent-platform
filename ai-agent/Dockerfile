@@ -21,9 +21,14 @@ COPY requirements.txt .
 
 # ==================== 关键修改开始 ====================
 # 1. 先单独安装 torch（使用官方 CPU 版本，体积小）
+# 1. 先单独安装 torch（使用阿里云镜像加速）
 RUN pip install --no-cache-dir \
-    --index-url https://download.pytorch.org/whl/cpu \
-    torch==2.0.1+cpu
+    -i https://mirrors.aliyun.com/pypi/simple/ \
+    --trusted-host mirrors.aliyun.com \
+    --default-timeout=600 \
+    --retries=10 \
+    torch==2.2.2+cpu \
+    --extra-index-url https://download.pytorch.org/whl/cpu
 
 # 2. 创建不包含 torch 的临时 requirements 文件
 RUN grep -v "^torch" requirements.txt > /tmp/requirements_no_torch.txt

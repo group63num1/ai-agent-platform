@@ -17,6 +17,7 @@ langchain-text-splitters
 
 # 向量数据库和嵌入
 faiss-cpu
+torch==2.2.2+cpu --index-url https://download.pytorch.org/whl/cpu
 sentence-transformers
 
 # HTTP 请求
