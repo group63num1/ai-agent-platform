@@ -19,27 +19,11 @@ RUN apt-get update && apt-get install -y \
 # 复制依赖文件
 COPY requirements.txt .
 
-# ==================== 关键修改开始 ====================
-# 1. 先单独安装 torch（使用官方 CPU 版本，体积小）
-# 1. 先单独安装 torch（使用阿里云镜像加速）
-RUN pip install --no-cache-dir \
-    -i https://mirrors.aliyun.com/pypi/simple/ \
-    --trusted-host mirrors.aliyun.com \
-    --default-timeout=600 \
-    --retries=10 \
-    torch==2.2.2+cpu \
-    --extra-index-url https://download.pytorch.org/whl/cpu
-
-# 2. 创建不包含 torch 的临时 requirements 文件
-RUN grep -v "^torch" requirements.txt > /tmp/requirements_no_torch.txt
-
-# 3. 安装其他依赖（使用阿里云镜像，通常更快）
 RUN pip install --no-cache-dir \
     -i https://mirrors.aliyun.com/pypi/simple/ \
     --trusted-host mirrors.aliyun.com \
     --default-timeout=300 \
-    -r /tmp/requirements_no_torch.txt
-# ==================== 关键修改结束 ====================
+    -r requirements.txt
 
 # 复制应用代码
 COPY . .

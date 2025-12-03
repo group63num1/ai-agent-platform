@@ -1,32 +1,23 @@
-# FastAPI 和 Web 服务器（只固定关键版本，其他交给 pip 自动选兼容版本）
 fastapi==0.115.0
 uvicorn[standard]==0.32.0
 python-dotenv
 pydantic
 
-# 数据库相关（不固定精确版本，避免与 langchain 冲突）
+# 数据库相关
 sqlalchemy
 pymysql
 cryptography
 
-# LangChain 相关（不锁死版本，让 langchain 一家自己解依赖）
-langchain
+# LangChain 相关（仅保留实际使用的子包）
 langchain-core
 langchain-community
 langchain-text-splitters
 
-# 向量数据库和嵌入
-faiss-cpu
-torch==2.2.2+cpu --index-url https://download.pytorch.org/whl/cpu
-sentence-transformers
-
 # HTTP 请求
 requests
-httpx
 
 # 工具和工具类
-openapi-spec-validator
 pyyaml
 
-# 日志和工具
+# 文件上传等
 python-multipart

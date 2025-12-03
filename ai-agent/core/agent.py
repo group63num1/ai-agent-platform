@@ -9,8 +9,6 @@ from typing import List, Dict, Any, Optional
 from pathlib import Path
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import FAISS
-from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 
@@ -159,16 +157,17 @@ class RAGRetriever:
         self.chunk_size = chunk_size or config.CHUNK_SIZE
         self.chunk_overlap = chunk_overlap or config.CHUNK_OVERLAP
         self.retrieval_k = retrieval_k or config.RETRIEVAL_K
-        self.embeddings = HuggingFaceEmbeddings(
-            model_name="sentence-transformers/all-MiniLM-L6-v2"
-        )
+        # 轻量版：仅使用文本切分和简单关键字匹配，不依赖向量数据库/大模型嵌入
         self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=chunk_size, chunk_overlap=chunk_overlap, length_function=len
+            chunk_size=self.chunk_size,
+            chunk_overlap=self.chunk_overlap,
+            length_function=len,
         )
-        self.vectorstore = self._build_vectorstore()
+        self._chunks: List[Document] = self._build_corpus()
 
     def _load_txt_files(self) -> List[Document]:
-        documents = []
+        """加载语料库中的 txt 文件，构造成 Document 列表。"""
+        documents: List[Document] = []
         corpus_path = Path(self.txt_corpus_path)
         if not corpus_path.exists():
             print(f"语料库路径不存在: {self.txt_corpus_path}")
@@ -187,31 +186,54 @@ class RAGRetriever:
                 print(f"加载文件失败 {txt_file}: {e}")
         return documents
 
-    def _build_vectorstore(self) -> FAISS:
-        print("正在构建向量数据库...")
+    def _build_corpus(self) -> List[Document]:
+        """构建轻量级语料切片列表（无向量库、无嵌入）。"""
+        print("正在构建轻量级 RAG 语料...")
         documents = self._load_txt_files()
         if not documents:
-            print("未找到任何txt文件，创建空向量库")
-            dummy_doc = Document(page_content="空文档", metadata={"source": "dummy"})
-            split_docs = self.text_splitter.split_documents([dummy_doc])
-            return FAISS.from_documents(split_docs, self.embeddings)
+            print("未找到任何 txt 文件，将返回空检索结果")
+            return []
         split_docs = self.text_splitter.split_documents(documents)
         print(f"文档分割完成，共 {len(split_docs)} 个片段")
-        vectorstore = FAISS.from_documents(split_docs, self.embeddings)
-        print("向量数据库构建完成")
-        return vectorstore
+        return split_docs
 
     def retrieve(self, query: str, k: int = None) -> List[Dict[str, Any]]:
+        """基于简单关键字匹配的轻量版检索，实现快速无依赖的 RAG。"""
         try:
             k = k or self.retrieval_k
-            docs = self.vectorstore.similarity_search(query, k=k)
+            if not self._chunks:
+                return []
+
+            query_lower = query.lower()
+            scored: List[Dict[str, Any]] = []
+            for d in self._chunks:
+                text = d.page_content or ""
+                text_lower = text.lower()
+                if not text_lower:
+                    continue
+                # 简单打分：包含次数 + 覆盖比例
+                count = text_lower.count(query_lower) if query_lower else 0
+                coverage = len(query_lower) / max(len(text_lower), 1) if query_lower else 0
+                score = count + coverage
+                if score > 0:
+                    scored.append(
+                        {
+                            "content": text,
+                            "source": d.metadata.get("source", "unknown"),
+                            "score": score,
+                        }
+                    )
+
+            # 根据分数排序，取前 k 条
+            scored.sort(key=lambda x: x["score"], reverse=True)
+            top = scored[:k]
             return [
                 {
-                    "content": d.page_content,
-                    "source": d.metadata.get("source", "unknown"),
-                    "relevance_score": "high",
+                    "content": item["content"],
+                    "source": item["source"],
+                    "relevance_score": item["score"],
                 }
-                for d in docs
+                for item in top
             ]
         except Exception as e:
             print(f"检索失败: {e}")
