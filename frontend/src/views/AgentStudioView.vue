@@ -50,10 +50,20 @@
               <el-input-number v-model="settings.maxTokens" :min="64" :max="4096" />
             </el-form-item>
             <el-form-item label="插件选择">
-              <el-select v-model="settings.plugins" multiple placeholder="选择插件">
-                <el-option label="检索知识库" value="kb-retrieval" />
-                <el-option label="网页抓取" value="web-scraper" />
-                <el-option label="结构化填表" value="form-filler" />
+              <el-select
+                v-model="settings.plugins"
+                multiple
+                filterable
+                :loading="loadingPlugins"
+                placeholder="选择插件"
+                @visible-change="(v) => { if (v && pluginOptions.length === 0) fetchPlugins() }"
+              >
+                <el-option
+                  v-for="opt in pluginOptions"
+                  :key="opt.value"
+                  :label="opt.label"
+                  :value="opt.value"
+                />
               </el-select>
             </el-form-item>
           </el-form>
@@ -91,6 +101,7 @@ import { useAgentsStore } from '@/stores/agents'
 import { updateAgent, getAgent } from '@/api/agent'
 import { chatWithAgent, getAgentChatMessages } from '@/api/agent'
 import { ArrowLeft } from '@element-plus/icons-vue'
+import { getPlugins } from '@/api/plugins'
 
 const route = useRoute()
 const router = useRouter()
@@ -113,6 +124,20 @@ const chatting = ref(false)
 const messages = ref([])
 const localHistoryKey = `agent_chat_history_${agentId}`
 const FIXED_MODEL = 'deepseek-ai/DeepSeek-R1-Distill-Qwen-7B'
+const pluginOptions = ref([])
+const loadingPlugins = ref(false)
+
+async function fetchPlugins() {
+  loadingPlugins.value = true
+  try {
+    const options = await getPlugins()
+    pluginOptions.value = options
+  } catch (e) {
+    console.warn('加载插件列表失败:', e)
+  } finally {
+    loadingPlugins.value = false
+  }
+}
 
 onMounted(async () => {
   await store.fetchDetail(agentId)
