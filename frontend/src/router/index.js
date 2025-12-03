@@ -7,6 +7,9 @@ const Apps = () => import('@/views/AppsView.vue')
 const Profile = () => import('@/views/ProfileView.vue')
 const Plugins = () => import('@/views/PluginsView.vue')
 const Chat = () => import('@/views/ChatView.vue')
+const Agents = () => import('@/views/AgentsView.vue')
+const AgentDetail = () => import('@/views/AgentDetailView.vue')
+const AgentStudio = () => import('@/views/AgentStudioView.vue')
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -73,6 +76,34 @@ const router = createRouter({
             requiresAuth: true
           }
         }
+        ,
+        {
+          path: 'agents',
+          name: 'agents',
+          component: Agents,
+          meta: {
+            title: '智能体管理',
+            requiresAuth: true
+          }
+        },
+        {
+          path: 'agents/:id/studio',
+          name: 'agentStudio',
+          component: AgentStudio,
+          meta: {
+            title: '智能体工作台',
+            requiresAuth: true
+          }
+        },
+        {
+          path: 'agents/:id',
+          name: 'agentDetail',
+          component: AgentDetail,
+          meta: {
+            title: '智能体详情',
+            requiresAuth: true
+          }
+        }
       ]
     },
     // 兼容旧的 /apps 路径，重定向到 /home/apps
@@ -87,6 +118,8 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('token')
   const isLoginPage = to.name === 'login' || to.path === '/'
+  // 检查是否为应用首次启动的初始导航（from.name 在首次导航时通常为 undefined/null）
+  const isInitialNavigation = !from || !from.name
   
   // 1. 未登录用户只能访问登录页
   if (!token) {
@@ -103,7 +136,13 @@ router.beforeEach((to, from, next) => {
     return
   }
   
-  // 2. 已登录用户访问登录页自动跳转首页
+  // 2. 应用启动时（首次导航）仅在无 token 情况下强制跳转到登录页
+  if (isInitialNavigation && !isLoginPage && !token) {
+    next({ name: 'login', query: { redirect: to.fullPath } })
+    return
+  }
+
+  // 3. 已登录用户访问登录页自动跳转首页
   if (isLoginPage && token) {
     next('/home')
     return
