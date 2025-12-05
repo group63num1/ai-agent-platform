@@ -39,8 +39,28 @@ let MENUS = [
   { title: '首页', path: '/home', icon: 'House', permission: 'home:view', sortOrder: 1 },
   { title: '应用管理', path: '/home/apps', icon: 'Grid', permission: 'apps:view', sortOrder: 2 },
   { title: '智能体管理', path: '/home/agents', icon: 'Grid', permission: 'agents:view', sortOrder: 3 },
+  { title: '插件管理', path: '/home/plugins', icon: 'Grid', permission: 'plugins:view', sortOrder: 5},
+  { title: '知识库管理', path: '/home/knowledge-bases', icon: 'Grid', permission: 'kb:view', sortOrder: 4 },
   { title: '个人信息', path: '/home/profile', icon: 'User', permission: 'profile:view', sortOrder: 9 }
 ]
+
+// 知识库数据
+let KNOWLEDGE_BASES = [
+  {
+    id: nanoid(8),
+    name: '样例知识库',
+    description: '这是一个示例知识库',
+    category: 'personal',
+    documentCount: 2,
+    chunkCount: 10,
+    totalSize: 5120,
+    creator: 'admin',
+    createdAt: Date.now() - 86400000,
+    updatedAt: Date.now() - 3600000
+  }
+]
+
+let DOCUMENTS = {}
 
 // 伪鉴权：约定一个固定 token
 const VALID_TOKEN = 'mock-token'
@@ -53,7 +73,7 @@ function auth(req, res, next) {
 }
 
 // 登录
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/v1/auth/login', (req, res) => {
   const { username } = req.body
   const user = USERS.find(u => u.username === username) || USERS[0]
   return res.json(ok({ userId: user.userId, username: user.username, token: VALID_TOKEN }))
@@ -73,7 +93,7 @@ app.delete('/api/v1/user/profile', auth, (req, res) => {
 })
 
 // 菜单
-app.get('/api/menus', auth, (req, res) => {
+app.get('/api/v1/menus', auth, (req, res) => {
   res.json(ok(MENUS))
 })
 
@@ -173,6 +193,185 @@ app.get('/api/agents/:id/chat/messages', (req, res) => {
   const lmt = parseInt(limit)
   const items = agent.chatHistory.slice(Math.max(0, agent.chatHistory.length - lmt))
   res.json(ok(items))
+})
+
+// ==================== 知识库管理 API ====================
+
+// 获取知识库列表
+app.get('/api/knowledge-bases', (req, res) => {
+  let { page = 1, pageSize = 20, keyword = '' } = req.query
+  page = parseInt(page)
+  pageSize = parseInt(pageSize)
+  let items = KNOWLEDGE_BASES.filter(
+    kb => !keyword || kb.name.includes(keyword) || kb.description.includes(keyword)
+  )
+  const total = items.length
+  const start = (page - 1) * pageSize
+  const end = start + pageSize
+  items = items.slice(start, end)
+  res.json(ok({ items, total, page, pageSize }))
+})
+
+// 创建知识库
+app.post('/api/knowledge-bases', (req, res) => {
+  const { name, description, category } = req.body || {}
+  if (!name) return res.status(400).json(fail(400, '名称必填'))
+  const kb = {
+    id: nanoid(8),
+    name,
+    description: description || '',
+    category: category || 'personal',
+    documentCount: 0,
+    chunkCount: 0,
+    totalSize: 0,
+    creator: 'admin',
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  }
+  KNOWLEDGE_BASES.unshift(kb)
+  DOCUMENTS[kb.id] = []
+  res.json(ok(kb))
+})
+
+// 获取知识库详情
+app.get('/api/knowledge-bases/:id', (req, res) => {
+  const kb = KNOWLEDGE_BASES.find(k => k.id === req.params.id)
+  if (!kb) return res.status(404).json(fail(404, '未找到知识库'))
+  res.json(ok(kb))
+})
+
+// 更新知识库
+app.put('/api/knowledge-bases/:id', (req, res) => {
+  const idx = KNOWLEDGE_BASES.findIndex(k => k.id === req.params.id)
+  if (idx === -1) return res.status(404).json(fail(404, '未找到知识库'))
+  const patch = req.body || {}
+  KNOWLEDGE_BASES[idx] = {
+    ...KNOWLEDGE_BASES[idx],
+    ...patch,
+    updatedAt: Date.now()
+  }
+  res.json(ok(KNOWLEDGE_BASES[idx]))
+})
+
+// 删除知识库
+app.delete('/api/knowledge-bases/:id', (req, res) => {
+  const idx = KNOWLEDGE_BASES.findIndex(k => k.id === req.params.id)
+  if (idx === -1) return res.status(404).json(fail(404, '未找到知识库'))
+  const removed = KNOWLEDGE_BASES[idx]
+  KNOWLEDGE_BASES.splice(idx, 1)
+  delete DOCUMENTS[removed.id]
+  res.json(ok({ id: removed.id }))
+})
+
+// 获取知识库的文档列表
+app.get('/api/knowledge-bases/:id/documents', (req, res) => {
+  if (!DOCUMENTS[req.params.id]) {
+    return res.status(404).json(fail(404, '未找到知识库'))
+  }
+  const docs = DOCUMENTS[req.params.id] || []
+  res.json(ok(docs))
+})
+
+// 上传文档
+app.post('/api/knowledge-bases/:id/documents', (req, res) => {
+  if (!DOCUMENTS[req.params.id]) {
+    return res.status(404).json(fail(404, '未找到知识库'))
+  }
+  
+  const { title = '新文档', splitMethod = 'fixed', chunkSize = 500, autoVectorize = true } = req.body || {}
+  
+  const doc = {
+    id: nanoid(8),
+    name: title,
+    size: Math.floor(Math.random() * 100000) + 10000,
+    chunkCount: Math.floor(Math.random() * 50) + 5,
+    status: autoVectorize ? 'processing' : 'pending',
+    uploadedAt: Date.now(),
+    splitMethod,
+    chunkSize
+  }
+  
+  DOCUMENTS[req.params.id].push(doc)
+  
+  // 更新知识库统计
+  const kb = KNOWLEDGE_BASES.find(k => k.id === req.params.id)
+  if (kb) {
+    kb.documentCount = DOCUMENTS[req.params.id].length
+    kb.chunkCount = DOCUMENTS[req.params.id].reduce((sum, d) => sum + d.chunkCount, 0)
+    kb.totalSize = DOCUMENTS[req.params.id].reduce((sum, d) => sum + d.size, 0)
+    kb.updatedAt = Date.now()
+    
+    // 模拟处理完成
+    setTimeout(() => {
+      doc.status = 'processed'
+    }, 2000)
+  }
+  
+  res.json(ok(doc))
+})
+
+// 删除文档
+app.delete('/api/knowledge-bases/:id/documents/:docId', (req, res) => {
+  if (!DOCUMENTS[req.params.id]) {
+    return res.status(404).json(fail(404, '未找到知识库'))
+  }
+  
+  const idx = DOCUMENTS[req.params.id].findIndex(d => d.id === req.params.docId)
+  if (idx === -1) {
+    return res.status(404).json(fail(404, '未找到文档'))
+  }
+  
+  const removed = DOCUMENTS[req.params.id][idx]
+  DOCUMENTS[req.params.id].splice(idx, 1)
+  
+  // 更新知识库统计
+  const kb = KNOWLEDGE_BASES.find(k => k.id === req.params.id)
+  if (kb) {
+    kb.documentCount = DOCUMENTS[req.params.id].length
+    kb.chunkCount = DOCUMENTS[req.params.id].reduce((sum, d) => sum + d.chunkCount, 0)
+    kb.totalSize = DOCUMENTS[req.params.id].reduce((sum, d) => sum + d.size, 0)
+    kb.updatedAt = Date.now()
+  }
+  
+  res.json(ok({ id: removed.id }))
+})
+
+// 向量检索
+app.post('/api/knowledge-bases/:id/search', (req, res) => {
+  if (!KNOWLEDGE_BASES.find(k => k.id === req.params.id)) {
+    return res.status(404).json(fail(404, '未找到知识库'))
+  }
+  
+  const { query = '', topK = 5, similarityThreshold = 0.5 } = req.body || {}
+  
+  if (!query.trim()) {
+    return res.status(400).json(fail(400, '查询内容不能为空'))
+  }
+  
+  // 模拟向量检索结果
+  const mockResults = []
+  const docCount = Math.min(topK, 3)
+  
+  for (let i = 0; i < docCount; i++) {
+    const score = 0.95 - i * 0.15
+    if (score >= similarityThreshold) {
+      mockResults.push({
+        id: nanoid(8),
+        content: `这是查询"${query}"的第 ${i + 1} 个相关结果的摘要文本。包含了与你的查询相关的信息内容...`,
+        source: `样例文档 ${i + 1}`,
+        score: parseFloat(score.toFixed(2)),
+        chunkIndex: i
+      })
+    }
+  }
+  
+  res.json(ok({
+    items: mockResults,
+    total: mockResults.length,
+    query,
+    topK,
+    similarityThreshold
+  }))
 })
 
 app.listen(PORT, () => {
