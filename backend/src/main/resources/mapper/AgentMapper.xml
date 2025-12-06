@@ -14,24 +14,24 @@
         <result column="context_rounds" property="contextRounds"/>
         <result column="max_tokens" property="maxTokens"/>
         <result column="plugins" property="plugins"/>
+        <result column="knowledge_base" property="knowledgeBase"/>
         <result column="status" property="status"/>
-        <result column="session_id" property="sessionId"/>
         <result column="created_at" property="createdAt"/>
         <result column="updated_at" property="updatedAt"/>
     </resultMap>
 
     <sql id="AgentColumns">
         id, name, description, model, prompt, profile_md, context_rounds,
-        max_tokens, plugins, status, session_id, created_at, updated_at
+        max_tokens, plugins, knowledge_base, status, created_at, updated_at
     </sql>
 
     <insert id="insert" parameterType="com.example.demo.app.entity.Agent">
         INSERT INTO agents (
             id, name, description, model, prompt, profile_md, context_rounds,
-            max_tokens, plugins, status, session_id, created_at, updated_at
+            max_tokens, plugins, knowledge_base, status, created_at, updated_at
         ) VALUES (
             #{id}, #{name}, #{description}, #{model}, #{prompt}, #{profileMd},
-            #{contextRounds}, #{maxTokens}, #{plugins}, #{status}, #{sessionId},
+            #{contextRounds}, #{maxTokens}, #{plugins}, #{knowledgeBase}, #{status},
             #{createdAt}, #{updatedAt}
         )
     </insert>
@@ -72,6 +72,13 @@
         </where>
     </select>
 
+    <select id="selectByStatus" resultMap="AgentResultMap">
+        SELECT <include refid="AgentColumns"/>
+        FROM agents
+        WHERE status = #{status}
+        ORDER BY updated_at DESC
+    </select>
+
     <update id="update" parameterType="com.example.demo.app.entity.Agent">
         UPDATE agents
         <set>
@@ -83,8 +90,8 @@
             <if test="contextRounds != null">context_rounds = #{contextRounds},</if>
             <if test="maxTokens != null">max_tokens = #{maxTokens},</if>
             <if test="plugins != null">plugins = #{plugins},</if>
+            <if test="knowledgeBase != null">knowledge_base = #{knowledgeBase},</if>
             <if test="status != null">status = #{status},</if>
-            <if test="sessionId != null">session_id = #{sessionId},</if>
             <if test="updatedAt != null">updated_at = #{updatedAt},</if>
         </set>
         WHERE id = #{id}

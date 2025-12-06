@@ -1,5 +1,6 @@
 package com.example.demo.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -16,8 +17,9 @@ public class AgentDTO {
     private Integer contextRounds;
     private Integer maxTokens;
     private List<String> plugins;
+    @JsonProperty("knowledge_base")
+    private List<String> knowledgeBase;
     private String status;
-    private String sessionId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

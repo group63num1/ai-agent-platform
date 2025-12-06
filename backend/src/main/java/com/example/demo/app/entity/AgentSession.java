@@ -5,12 +5,11 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-public class AgentMessage {
-    private Long id;
+public class AgentSession {
     private String sessionId;
-    private String role;
-    private String content;
+    private String agentId;
+    private String name;
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }
-
 
