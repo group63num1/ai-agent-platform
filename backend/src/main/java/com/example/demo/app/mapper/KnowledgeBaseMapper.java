@@ -21,5 +21,10 @@ public interface KnowledgeBaseMapper {
                                    @Param("limit") int limit);
 
     int count(@Param("keyword") String keyword);
+
+    /**
+     * 获取已启用的知识库名称列表
+     */
+    List<String> selectEnabledNames();
 }
 

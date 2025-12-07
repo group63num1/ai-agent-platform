@@ -80,5 +80,12 @@
             </if>
         </where>
     </select>
+
+    <select id="selectEnabledNames" resultType="java.lang.String">
+        SELECT name
+        FROM knowledge_bases
+        WHERE enabled = 1
+        ORDER BY updated_at DESC
+    </select>
 </mapper>
 

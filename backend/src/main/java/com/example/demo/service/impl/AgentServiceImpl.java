@@ -234,6 +234,20 @@ public class AgentServiceImpl implements AgentService {
     }
 
     @Override
+    @Transactional
+    public AgentSessionDTO updateSession(String agentId, String sessionId, AgentSessionUpdateRequest request) {
+        AgentSession session = requireSession(sessionId, agentId);
+        if (request != null && !isBlank(request.getName())) {
+            session.setName(request.getName().trim());
+        }
+        session.setUpdatedAt(LocalDateTime.now());
+        if (agentSessionMapper.updateName(session.getSessionId(), session.getName(), session.getUpdatedAt()) <= 0) {
+            throw new RuntimeException("更新会话名称失败");
+        }
+        return toSessionDTO(session);
+    }
+
+    @Override
     public SseEmitter chatWithAgent(String agentId, String sessionId, AgentChatRequest request) {
         Agent agent = requireAgent(agentId);
         if (isBlank(sessionId)) {

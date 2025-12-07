@@ -33,5 +33,11 @@
     <delete id="deleteById">
         DELETE FROM agent_sessions WHERE session_id = #{sessionId}
     </delete>
+
+    <update id="updateName">
+        UPDATE agent_sessions
+        SET name = #{name}, updated_at = #{updatedAt}
+        WHERE session_id = #{sessionId}
+    </update>
 </mapper>
 

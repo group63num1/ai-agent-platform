@@ -107,5 +107,18 @@ public class KnowledgeBaseController {
             return ApiResponse.fail(400, e.getMessage());
         }
     }
+
+    /**
+     * 获取已启用的知识库名称列表
+     * GET /api/knowledge-bases/getlist
+     */
+    @GetMapping("/getlist")
+    public ApiResponse<List<String>> listEnabledNames() {
+        try {
+            return ApiResponse.ok(knowledgeBaseService.listEnabledNames());
+        } catch (Exception e) {
+            return ApiResponse.fail(400, e.getMessage());
+        }
+    }
 }
 

@@ -24,5 +24,10 @@ public interface KnowledgeBaseService {
     void deleteDocument(String kbId, Long docId);
 
     KnowledgeBaseSearchResponse search(String kbId, KnowledgeBaseSearchRequest request);
+
+    /**
+     * 获取已启用的知识库名称列表
+     */
+    List<String> listEnabledNames();
 }
 
