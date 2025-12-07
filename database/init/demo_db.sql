@@ -305,6 +305,41 @@ CREATE TABLE `knowledge_chunk_embedding` (
 -- 表的结构 `knowledge_document`
 --
 
+-- 表的结构 `knowledge_bases`
+--
+CREATE TABLE `knowledge_bases` (
+  `kb_id` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '知识库ID',
+  `user_id` bigint DEFAULT NULL COMMENT '创建者ID',
+  `name` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '知识库名称',
+  `description` text COLLATE utf8mb4_unicode_ci COMMENT '描述',
+  `category` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT 'personal' COMMENT '分类',
+  `document_count` int DEFAULT '0' COMMENT '文档数',
+  `chunk_count` int DEFAULT '0' COMMENT '分片数',
+  `total_size` bigint DEFAULT '0' COMMENT '总大小（字节）',
+  `milvus_collection` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '向量集合名',
+  `enabled` tinyint(1) DEFAULT '1' COMMENT '是否启用',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`kb_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='知识库表';
+
+-- 表的结构 `kb_documents`
+--
+CREATE TABLE `kb_documents` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '文档ID',
+  `kb_id` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '知识库ID',
+  `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '文档名称',
+  `size` bigint DEFAULT '0' COMMENT '文件大小（字节）',
+  `chunk_count` int DEFAULT NULL COMMENT '分片数量',
+  `status` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT 'pending' COMMENT '状态：pending/processing/processed/failed',
+  `split_method` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT 'recursive' COMMENT '分片方式',
+  `chunk_size` int DEFAULT '1000' COMMENT '分片大小',
+  `uploaded_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '上传时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_kb_doc_kb` (`kb_id`),
+  CONSTRAINT `fk_kb_doc_kb` FOREIGN KEY (`kb_id`) REFERENCES `knowledge_bases` (`kb_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='知识库文档表';
+
 CREATE TABLE `knowledge_document` (
   `id` bigint NOT NULL,
   `user_id` bigint NOT NULL COMMENT '上传者ID',

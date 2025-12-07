@@ -4,6 +4,7 @@ import com.example.demo.app.entity.Plugin;
 import com.example.demo.app.entity.PluginTool;
 import com.example.demo.app.mapper.PluginMapper;
 import com.example.demo.app.mapper.PluginToolMapper;
+import com.example.demo.config.AiAgentConfig;
 import com.example.demo.dto.*;
 import com.example.demo.service.PluginService;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -15,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,12 +36,18 @@ public class PluginServiceImpl implements PluginService {
     private static final String STATUS_DISABLED = "disabled";
     private static final String PUBLISH_UNPUBLISHED = "unpublished";
     private static final String PUBLISH_PUBLISHED = "published";
+    private static final String AI_AGENT_TOOL_PATH = "/api/tools";
+    private static final String AI_AGENT_FIELD_SUCCESS = "success";
+    private static final String AI_AGENT_FIELD_MESSAGE = "message";
 
     @Autowired
     private PluginMapper pluginMapper;
 
     @Autowired
     private PluginToolMapper pluginToolMapper;
+
+    @Autowired
+    private AiAgentConfig aiAgentConfig;
 
     @Autowired
     private org.springframework.web.client.RestTemplate restTemplate;
@@ -74,6 +82,7 @@ public class PluginServiceImpl implements PluginService {
         plugin.setUpdatedAt(now);
         pluginMapper.insert(plugin);
         saveTools(plugin.getId(), request.getTools());
+        createAiAgentTools(userId, request.getSpecJson());
         return getPluginDetail(plugin.getId());
     }
 
@@ -243,6 +252,56 @@ public class PluginServiceImpl implements PluginService {
             result.setResponse(null);
         }
         return result;
+    }
+
+    private void createAiAgentTools(Long userId, String specJson) {
+        if (StringUtils.isBlank(specJson)) {
+            return;
+        }
+        Map<String, Object> openApiSpec = parseOpenApiSpec(specJson);
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("user_id", String.valueOf(userId == null ? 0L : userId));
+        payload.put("openapi", openApiSpec);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, headers);
+
+        ResponseEntity<String> response = restTemplate.postForEntity(buildAiAgentUrl(AI_AGENT_TOOL_PATH), entity, String.class);
+        if (!response.getStatusCode().is2xxSuccessful()) {
+            throw new RuntimeException("AI Agent工具创建失败，状态码：" + response.getStatusCodeValue());
+        }
+        validateAiAgentResponse(response.getBody());
+    }
+
+    private Map<String, Object> parseOpenApiSpec(String specJson) {
+        try {
+            return objectMapper.readValue(specJson, new TypeReference<Map<String, Object>>() {});
+        } catch (IOException e) {
+            throw new RuntimeException("解析插件OpenAPI规范失败", e);
+        }
+    }
+
+    private String buildAiAgentUrl(String path) {
+        String base = Optional.ofNullable(aiAgentConfig.getBaseUrl()).orElse("http://127.0.0.1:8000");
+        String normalizedBase = base.endsWith("/") ? base.substring(0, base.length() - 1) : base;
+        String normalizedPath = path.startsWith("/") ? path : "/" + path;
+        return normalizedBase + normalizedPath;
+    }
+
+    private void validateAiAgentResponse(String body) {
+        if (StringUtils.isBlank(body)) {
+            return;
+        }
+        try {
+            JsonNode root = objectMapper.readTree(body);
+            if (root.has(AI_AGENT_FIELD_SUCCESS) && !root.path(AI_AGENT_FIELD_SUCCESS).asBoolean()) {
+                String message = root.path(AI_AGENT_FIELD_MESSAGE).asText("AI Agent返回失败");
+                throw new RuntimeException("AI Agent创建工具失败: " + message);
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("解析AI Agent响应失败", e);
+        }
     }
 
     private JsonNode parseSpec(Plugin plugin) {
