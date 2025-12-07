@@ -4,6 +4,7 @@ const Login = () => import('@/views/LoginView.vue')
 const Home = () => import('@/views/HomeView.vue')
 const Dashboard = () => import('@/views/DashboardView.vue')
 const Profile = () => import('@/views/ProfileView.vue')
+const Plugins = () => import('@/views/PluginsView.vue')
 const Chat = () => import('@/views/ChatView.vue')
 const Agents = () => import('@/views/AgentsView.vue')
 const AgentDetail = () => import('@/views/AgentDetailView.vue')
@@ -60,6 +61,15 @@ const router = createRouter({
           component: Chat,
           meta: {
             title: '智能客服助手',
+            requiresAuth: true
+          }
+        },
+        {
+          path: 'plugins',
+          name: 'plugins',
+          component: Plugins,
+          meta: {
+            title: '插件管理',
             requiresAuth: true
           }
         }
