@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.demo.app.mapper.KnowledgeBaseMapper">
+
+    <resultMap id="KnowledgeBaseMap" type="com.example.demo.app.entity.KnowledgeBase">
+        <id column="kb_id" property="kbId"/>
+        <result column="user_id" property="userId"/>
+        <result column="name" property="name"/>
+        <result column="description" property="description"/>
+        <result column="category" property="category"/>
+        <result column="document_count" property="documentCount"/>
+        <result column="chunk_count" property="chunkCount"/>
+        <result column="total_size" property="totalSize"/>
+        <result column="milvus_collection" property="milvusCollection"/>
+        <result column="enabled" property="enabled"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="BaseColumns">
+        kb_id, user_id, name, description, category, document_count, chunk_count, total_size,
+        milvus_collection, enabled, created_at, updated_at
+    </sql>
+
+    <insert id="insert" parameterType="com.example.demo.app.entity.KnowledgeBase">
+        INSERT INTO knowledge_bases (
+        kb_id, user_id, name, description, category, document_count, chunk_count, total_size,
+        milvus_collection, enabled, created_at, updated_at
+        ) VALUES (
+        #{kbId}, #{userId}, #{name}, #{description}, #{category}, #{documentCount},
+        #{chunkCount}, #{totalSize}, #{milvusCollection}, #{enabled}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <update id="update" parameterType="com.example.demo.app.entity.KnowledgeBase">
+        UPDATE knowledge_bases
+        <set>
+            <if test="name != null">name = #{name},</if>
+            <if test="description != null">description = #{description},</if>
+            <if test="category != null">category = #{category},</if>
+            <if test="documentCount != null">document_count = #{documentCount},</if>
+            <if test="chunkCount != null">chunk_count = #{chunkCount},</if>
+            <if test="totalSize != null">total_size = #{totalSize},</if>
+            <if test="milvusCollection != null">milvus_collection = #{milvusCollection},</if>
+            <if test="enabled != null">enabled = #{enabled},</if>
+            updated_at = #{updatedAt}
+        </set>
+        WHERE kb_id = #{kbId}
+    </update>
+
+    <select id="selectById" resultMap="KnowledgeBaseMap">
+        SELECT <include refid="BaseColumns"/>
+        FROM knowledge_bases
+        WHERE kb_id = #{kbId}
+    </select>
+
+    <delete id="delete">
+        DELETE FROM knowledge_bases WHERE kb_id = #{kbId}
+    </delete>
+
+    <select id="selectPage" resultMap="KnowledgeBaseMap">
+        SELECT <include refid="BaseColumns"/>
+        FROM knowledge_bases
+        <where>
+            <if test="keyword != null and keyword != ''">
+                (name LIKE CONCAT('%', #{keyword}, '%') OR description LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+        </where>
+        ORDER BY updated_at DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="count" resultType="int">
+        SELECT COUNT(1)
+        FROM knowledge_bases
+        <where>
+            <if test="keyword != null and keyword != ''">
+                (name LIKE CONCAT('%', #{keyword}, '%') OR description LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+        </where>
+    </select>
+</mapper>
+
