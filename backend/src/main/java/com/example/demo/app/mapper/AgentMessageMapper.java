@@ -10,11 +10,10 @@ import java.util.List;
 public interface AgentMessageMapper {
     int insert(AgentMessage message);
 
-    List<AgentMessage> selectRecentMessages(@Param("agentId") String agentId,
-                                            @Param("sessionId") String sessionId,
+    List<AgentMessage> selectRecentMessages(@Param("sessionId") String sessionId,
                                             @Param("limit") int limit);
 
-    List<AgentMessage> selectLatestMessages(@Param("agentId") String agentId,
+    List<AgentMessage> selectLatestMessages(@Param("sessionId") String sessionId,
                                             @Param("limit") int limit);
 }
 

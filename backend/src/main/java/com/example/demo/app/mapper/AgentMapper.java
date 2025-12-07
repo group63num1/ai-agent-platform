@@ -20,11 +20,14 @@ public interface AgentMapper {
 
     long countByKeyword(@Param("keyword") String keyword);
 
+    List<Agent> selectByStatus(@Param("status") String status);
+
     int update(Agent agent);
 
     int delete(@Param("id") String id);
 
     int updateStatus(@Param("id") String id, @Param("status") String status);
 }
+
 
 

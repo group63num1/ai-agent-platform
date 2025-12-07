@@ -15,8 +15,8 @@ public class Agent {
     private Integer contextRounds;
     private Integer maxTokens;
     private String plugins; // JSON array string
+    private String knowledgeBase; // JSON array string
     private String status;
-    private String sessionId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
