@@ -115,7 +115,11 @@ const transformMenuData = (menus) => {
   return menus
     .filter(menu => {
       // 过滤掉团队管理菜单
-      return menu.title !== '团队管理' && menu.path !== '/home/teams'
+      // 同时移除应用管理菜单
+      return (
+        menu.title !== '团队管理' && menu.path !== '/home/teams' &&
+        menu.title !== '应用管理' && menu.path !== '/home/apps'
+      )
     })
     .map(menu => ({
       title: menu.title,
@@ -154,14 +158,25 @@ const loadMenus = async () => {
       });
     }
 
+    // 确保包含产品管理菜单（后端未返回时补充）
+    const hasProductsMenu = transformed.some(item => item.path === '/home/products');
+    if (!hasProductsMenu) {
+      transformed.splice(2, 0, {
+        title: '产品管理',
+        path: '/home/products',
+        icon: iconMap.OfficeBuilding
+      });
+    }
+
     menuList.value = transformed;
   } catch (error) {
     console.error('加载菜单失败:', error)
     ElMessage.error('加载菜单失败: ' + (error.message || '未知错误'))
     menuList.value = [
       { title: '首页', path: '/home', icon: iconMap.House },
-      { title: '应用管理', path: '/home/apps', icon: iconMap.Grid },
+      { title: '插件管理', path: '/home/plugins', icon: iconMap.Setting },
       { title: '智能体管理', path: '/home/agents', icon: iconMap.Grid },
+      { title: '产品管理', path: '/home/products', icon: iconMap.OfficeBuilding },
       { title: '个人信息', path: '/home/profile', icon: iconMap.User }
     ]
   } finally {

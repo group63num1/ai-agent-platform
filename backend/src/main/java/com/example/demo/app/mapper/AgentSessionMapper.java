@@ -16,5 +16,9 @@ public interface AgentSessionMapper {
     List<AgentSession> selectByAgentId(@Param("agentId") String agentId);
 
     int deleteById(@Param("sessionId") String sessionId);
+
+    int updateName(@Param("sessionId") String sessionId,
+                   @Param("name") String name,
+                   @Param("updatedAt") java.time.LocalDateTime updatedAt);
 }
 

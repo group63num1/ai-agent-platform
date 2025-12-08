@@ -1,14 +1,7 @@
 package com.example.demo.controller;
 
 import com.example.demo.common.ApiResponse;
-import com.example.demo.dto.AgentChatRequest;
-import com.example.demo.dto.AgentDTO;
-import com.example.demo.dto.AgentListResponse;
-import com.example.demo.dto.AgentMessageDTO;
-import com.example.demo.dto.AgentSessionCreateRequest;
-import com.example.demo.dto.AgentSessionDTO;
-import com.example.demo.dto.AgentUpdateRequest;
-import com.example.demo.dto.AgentCreateRequest;
+import com.example.demo.dto.*;
 import com.example.demo.service.AgentService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -125,6 +118,17 @@ public class AgentController {
     public ApiResponse<List<AgentSessionDTO>> listSessions(@PathVariable("id") String id) {
         try {
             return ApiResponse.ok(agentService.listSessions(id));
+        } catch (Exception e) {
+            return ApiResponse.fail(400, e.getMessage());
+        }
+    }
+
+    @PutMapping("/{id}/sessions/{sessionId}")
+    public ApiResponse<AgentSessionDTO> updateSession(@PathVariable("id") String id,
+                                                      @PathVariable("sessionId") String sessionId,
+                                                      @RequestBody AgentSessionUpdateRequest request) {
+        try {
+            return ApiResponse.ok(agentService.updateSession(id, sessionId, request));
         } catch (Exception e) {
             return ApiResponse.fail(400, e.getMessage());
         }

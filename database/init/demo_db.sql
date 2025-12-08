@@ -217,7 +217,7 @@ CREATE TABLE `agent_sessions` (
   PRIMARY KEY (`session_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='智能体会话表';
 
--- --------------------------------------------------------
+
 -- --------------------------------------------------------
 
 --

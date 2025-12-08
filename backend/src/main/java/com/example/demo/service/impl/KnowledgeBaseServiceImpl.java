@@ -183,6 +183,11 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         return parseSearchResponse(resp.getBody(), request);
     }
 
+    @Override
+    public List<String> listEnabledNames() {
+        return knowledgeBaseMapper.selectEnabledNames();
+    }
+
     private KnowledgeBaseSearchResponse parseSearchResponse(String body, KnowledgeBaseSearchRequest request) {
         KnowledgeBaseSearchResponse response = new KnowledgeBaseSearchResponse();
         response.setQuery(request.getQuery());

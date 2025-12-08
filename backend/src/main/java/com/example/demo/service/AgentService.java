@@ -38,6 +38,8 @@ public interface AgentService {
     SseEmitter chatWithAgent(String agentId, String sessionId, AgentChatRequest request);
 
     List<AgentMessageDTO> listMessages(String agentId, String sessionId, Integer limit);
+
+    AgentSessionDTO updateSession(String agentId, String sessionId, com.example.demo.dto.AgentSessionUpdateRequest request);
 }
 
 
