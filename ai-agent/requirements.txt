@@ -1,0 +1,23 @@
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+python-dotenv
+pydantic
+
+# 数据库相关
+sqlalchemy
+pymysql
+cryptography
+
+# LangChain 相关（仅保留实际使用的子包）
+langchain-core
+langchain-community
+langchain-text-splitters
+
+# HTTP 请求
+requests
+
+# 工具和工具类
+pyyaml
+
+# 文件上传等
+python-multipart

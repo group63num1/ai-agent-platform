@@ -42,6 +42,7 @@ public class ModelAwareLlmService implements LlmService {
         mapping.put("doubao", "doubao");
         mapping.put("deepseek", "deepseek");
         mapping.put("deepseek-chat", "deepseek");
+	mapping.put("deepseek-ai/deepseek-r1-distill-qwen-7b".toLowerCase(Locale.ROOT), "deepseek");
         mapping.put("混元", "hunyuan");
         mapping.put("hunyuan", "hunyuan");
         mapping.put("tencent", "hunyuan");

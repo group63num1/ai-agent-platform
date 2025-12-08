@@ -1,7 +1,7 @@
 #=========================Makefile for Health Agent Platform ====================
 # 简化的容器化部署命令接口
 
-.PHONY: help deploy build build-backend build-frontend start stop restart logs logs-backend logs-frontend logs-mysql ps clean status backup
+.PHONY: help deploy build build-backend build-frontend build-ai-agent start stop restart logs logs-backend logs-frontend logs-ai-agent logs-mysql ps clean status backup
 
 .DEFAULT_GOAL := help
 
@@ -16,6 +16,7 @@ help:
 	@echo "  make build          - ������ 构建所有镜像"
 	@echo "  make build-backend  - ������ 只构建后端"
 	@echo "  make build-frontend - ������ 只构建前端"
+	@echo "  make build-ai-agent -  只构建 AI Agent"
 	@echo ""
 	@echo "服务控制："
 	@echo "  make start          - ▶️  启动所有服务"
@@ -27,6 +28,7 @@ help:
 	@echo "  make logs           - ������ 查看所有服务日志"
 	@echo "  make logs-backend   - ������ 查看后端日志"
 	@echo "  make logs-frontend  - ������ 查看前端日志"
+	@echo "  make logs-ai-agent  -  查看 AI Agent 日志"
 	@echo "  make logs-mysql     - ������ 查看数据库日志"
 	@echo ""
 	@echo "运维管理："
@@ -52,6 +54,10 @@ build-backend:
 build-frontend:
 	@echo "������ 构建前端镜像..."
 	@docker-compose build web-admin
+
+build-ai-agent:
+	@echo "������ 构建 AI Agent 镜像..."
+	@docker-compose build ai-agent
 
 # ==================== 服务控制 ====================
 start:
@@ -81,6 +87,9 @@ logs-backend:
 
 logs-frontend:
 	@docker-compose logs -f web-admin
+
+logs-ai-agent:
+	@docker-compose logs -f ai-agent
 
 logs-mysql:
 	@docker-compose logs -f mysql
