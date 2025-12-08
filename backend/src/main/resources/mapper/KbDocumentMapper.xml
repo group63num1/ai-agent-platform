@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.demo.app.mapper.KbDocumentMapper">
+
+    <resultMap id="KbDocumentMap" type="com.example.demo.app.entity.KbDocument">
+        <id column="id" property="id"/>
+        <result column="kb_id" property="kbId"/>
+        <result column="name" property="name"/>
+        <result column="size" property="size"/>
+        <result column="chunk_count" property="chunkCount"/>
+        <result column="status" property="status"/>
+        <result column="split_method" property="splitMethod"/>
+        <result column="chunk_size" property="chunkSize"/>
+        <result column="uploaded_at" property="uploadedAt"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.example.demo.app.entity.KbDocument" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO kb_documents (
+        kb_id, name, size, chunk_count, status, split_method, chunk_size, uploaded_at
+        ) VALUES (
+        #{kbId}, #{name}, #{size}, #{chunkCount}, #{status}, #{splitMethod}, #{chunkSize}, #{uploadedAt}
+        )
+    </insert>
+
+    <select id="selectByKbId" resultMap="KbDocumentMap">
+        SELECT id, kb_id, name, size, chunk_count, status, split_method, chunk_size, uploaded_at
+        FROM kb_documents
+        WHERE kb_id = #{kbId}
+        ORDER BY uploaded_at DESC
+    </select>
+
+    <delete id="deleteById">
+        DELETE FROM kb_documents WHERE id = #{id}
+    </delete>
+</mapper>
+

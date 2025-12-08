@@ -4,7 +4,9 @@ import com.example.demo.common.ApiResponse;
 import com.example.demo.dto.*;
 import com.example.demo.service.AgentService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 
@@ -30,6 +32,15 @@ public class AgentController {
                                                      @RequestParam(required = false) String keyword) {
         try {
             return ApiResponse.ok(agentService.listAgents(page, pageSize, keyword));
+        } catch (Exception e) {
+            return ApiResponse.fail(400, e.getMessage());
+        }
+    }
+
+    @GetMapping("/published")
+    public ApiResponse<List<AgentDTO>> listPublishedAgents() {
+        try {
+            return ApiResponse.ok(agentService.listPublishedAgents());
         } catch (Exception e) {
             return ApiResponse.fail(400, e.getMessage());
         }
@@ -73,21 +84,69 @@ public class AgentController {
         }
     }
 
-    @PostMapping("/{id}/chat")
-    public ApiResponse<AgentChatResponse> chat(@PathVariable("id") String id,
-                                               @RequestBody AgentChatRequest request) {
+    @PostMapping("/{id}/unpublish")
+    public ApiResponse<AgentDTO> unpublishAgent(@PathVariable("id") String id) {
         try {
-            return ApiResponse.ok(agentService.chatWithAgent(id, request));
+            return ApiResponse.ok(agentService.unpublishAgent(id));
+        } catch (Exception e) {
+            return ApiResponse.fail(409, e.getMessage());
+        }
+    }
+
+    @PostMapping("/{id}/sessions")
+    public ApiResponse<AgentSessionDTO> createSession(@PathVariable("id") String id,
+                                                      @RequestBody(required = false) AgentSessionCreateRequest request) {
+        try {
+            return ApiResponse.ok(agentService.createSession(id, request));
         } catch (Exception e) {
             return ApiResponse.fail(400, e.getMessage());
         }
     }
 
-    @GetMapping("/{id}/chat/messages")
+    @DeleteMapping("/{id}/sessions/{sessionId}")
+    public ApiResponse<Void> deleteSession(@PathVariable("id") String id,
+                                           @PathVariable("sessionId") String sessionId) {
+        try {
+            agentService.deleteSession(id, sessionId);
+            return ApiResponse.ok();
+        } catch (Exception e) {
+            return ApiResponse.fail(400, e.getMessage());
+        }
+    }
+
+    @GetMapping("/{id}/sessions")
+    public ApiResponse<List<AgentSessionDTO>> listSessions(@PathVariable("id") String id) {
+        try {
+            return ApiResponse.ok(agentService.listSessions(id));
+        } catch (Exception e) {
+            return ApiResponse.fail(400, e.getMessage());
+        }
+    }
+
+    @PutMapping("/{id}/sessions/{sessionId}")
+    public ApiResponse<AgentSessionDTO> updateSession(@PathVariable("id") String id,
+                                                      @PathVariable("sessionId") String sessionId,
+                                                      @RequestBody AgentSessionUpdateRequest request) {
+        try {
+            return ApiResponse.ok(agentService.updateSession(id, sessionId, request));
+        } catch (Exception e) {
+            return ApiResponse.fail(400, e.getMessage());
+        }
+    }
+
+    @PostMapping(value = "/{id}/sessions/{sessionId}/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter chat(@PathVariable("id") String id,
+                           @PathVariable("sessionId") String sessionId,
+                           @RequestBody AgentChatRequest request) {
+        return agentService.chatWithAgent(id, sessionId, request);
+    }
+
+    @GetMapping("/{id}/sessions/{sessionId}/messages")
     public ApiResponse<List<AgentMessageDTO>> listMessages(@PathVariable("id") String id,
+                                                           @PathVariable("sessionId") String sessionId,
                                                            @RequestParam(required = false) Integer limit) {
         try {
-            return ApiResponse.ok(agentService.listMessages(id, limit));
+            return ApiResponse.ok(agentService.listMessages(id, sessionId, limit));
         } catch (Exception e) {
             return ApiResponse.fail(400, e.getMessage());
         }

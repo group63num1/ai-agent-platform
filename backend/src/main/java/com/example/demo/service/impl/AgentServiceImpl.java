@@ -2,19 +2,26 @@ package com.example.demo.service.impl;
 
 import com.example.demo.app.entity.Agent;
 import com.example.demo.app.entity.AgentMessage;
+import com.example.demo.app.entity.AgentSession;
 import com.example.demo.app.mapper.AgentMapper;
 import com.example.demo.app.mapper.AgentMessageMapper;
+import com.example.demo.app.mapper.AgentSessionMapper;
 import com.example.demo.dto.*;
+import com.example.demo.service.AiAgentClient;
 import com.example.demo.service.AgentService;
-import com.example.demo.service.LlmService;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 @Service
@@ -27,6 +34,7 @@ public class AgentServiceImpl implements AgentService {
     private static final int DEFAULT_MAX_TOKENS = 512;
     private static final String DEFAULT_SYSTEM_PROMPT =
             "You are an AI agent assistant. Answer accurately, concisely and stay within the given role.";
+    private static final String STREAM_DONE_TOKEN = "[DONE]";
 
     @Autowired
     private AgentMapper agentMapper;
@@ -35,7 +43,10 @@ public class AgentServiceImpl implements AgentService {
     private AgentMessageMapper agentMessageMapper;
 
     @Autowired
-    private LlmService llmService;
+    private AgentSessionMapper agentSessionMapper;
+
+    @Autowired
+    private AiAgentClient aiAgentClient;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -55,8 +66,8 @@ public class AgentServiceImpl implements AgentService {
         agent.setContextRounds(resolveContextRounds(request.getContextRounds()));
         agent.setMaxTokens(resolveMaxTokens(request.getMaxTokens()));
         agent.setPlugins(serializePlugins(request.getPlugins()));
+        agent.setKnowledgeBase(serializeKnowledgeBase(request.getKnowledgeBase()));
         agent.setStatus(STATUS_DRAFT);
-        agent.setSessionId(generateSessionId());
         LocalDateTime now = LocalDateTime.now();
         agent.setCreatedAt(now);
         agent.setUpdatedAt(now);
@@ -83,6 +94,12 @@ public class AgentServiceImpl implements AgentService {
         response.setPage(safePage);
         response.setPageSize(safeSize);
         return response;
+    }
+
+    @Override
+    public List<AgentDTO> listPublishedAgents() {
+        List<Agent> publishedAgents = agentMapper.selectByStatus(STATUS_PUBLISHED);
+        return publishedAgents.stream().map(this::toDTO).collect(Collectors.toList());
     }
 
     @Override
@@ -123,11 +140,11 @@ public class AgentServiceImpl implements AgentService {
         if (request.getPlugins() != null) {
             agent.setPlugins(serializePlugins(request.getPlugins()));
         }
+        if (request.getKnowledgeBase() != null) {
+            agent.setKnowledgeBase(serializeKnowledgeBase(request.getKnowledgeBase()));
+        }
         if (!isBlank(request.getStatus())) {
             agent.setStatus(request.getStatus().trim());
-        }
-        if (!isBlank(request.getSessionId())) {
-            agent.setSessionId(request.getSessionId().trim());
         }
         agent.setUpdatedAt(LocalDateTime.now());
 
@@ -169,59 +186,222 @@ public class AgentServiceImpl implements AgentService {
 
     @Override
     @Transactional
-    public AgentChatResponse chatWithAgent(String agentId, AgentChatRequest request) {
+    public AgentDTO unpublishAgent(String agentId) {
         Agent agent = requireAgent(agentId);
+        if (!STATUS_PUBLISHED.equals(agent.getStatus())) {
+            throw new RuntimeException("仅已发布的智能体可下架");
+        }
+        agent.setStatus(STATUS_DRAFT);
+        agent.setUpdatedAt(LocalDateTime.now());
+        if (agentMapper.update(agent) <= 0) {
+            throw new RuntimeException("下架智能体失败");
+        }
+        return toDTO(agent);
+    }
+
+    @Override
+    @Transactional
+    public AgentSessionDTO createSession(String agentId, AgentSessionCreateRequest request) {
+        Agent agent = requireAgent(agentId);
+        AgentSession session = new AgentSession();
+        session.setSessionId(generateSessionId());
+        session.setAgentId(agent.getId());
+        session.setName(request == null ? null : trimToNull(request.getName()));
+        LocalDateTime now = LocalDateTime.now();
+        session.setCreatedAt(now);
+        session.setUpdatedAt(now);
+        if (agentSessionMapper.insert(session) <= 0) {
+            throw new RuntimeException("创建会话失败");
+        }
+        return toSessionDTO(session);
+    }
+
+    @Override
+    @Transactional
+    public void deleteSession(String agentId, String sessionId) {
+        requireAgent(agentId);
+        AgentSession session = requireSession(sessionId, agentId);
+        if (agentSessionMapper.deleteById(session.getSessionId()) <= 0) {
+            throw new RuntimeException("删除会话失败");
+        }
+    }
+
+    @Override
+    public List<AgentSessionDTO> listSessions(String agentId) {
+        requireAgent(agentId);
+        List<AgentSession> sessions = agentSessionMapper.selectByAgentId(agentId);
+        return sessions.stream().map(this::toSessionDTO).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public AgentSessionDTO updateSession(String agentId, String sessionId, AgentSessionUpdateRequest request) {
+        AgentSession session = requireSession(sessionId, agentId);
+        if (request != null && !isBlank(request.getName())) {
+            session.setName(request.getName().trim());
+        }
+        session.setUpdatedAt(LocalDateTime.now());
+        if (agentSessionMapper.updateName(session.getSessionId(), session.getName(), session.getUpdatedAt()) <= 0) {
+            throw new RuntimeException("更新会话名称失败");
+        }
+        return toSessionDTO(session);
+    }
+
+    @Override
+    public SseEmitter chatWithAgent(String agentId, String sessionId, AgentChatRequest request) {
+        Agent agent = requireAgent(agentId);
+        if (isBlank(sessionId)) {
+            throw new RuntimeException("sessionId不能为空");
+        }
+        AgentSession session = requireSession(sessionId, agentId);
         if (request == null || isBlank(request.getMessage())) {
             throw new RuntimeException("message不能为空");
         }
 
-        String sessionId = isBlank(agent.getSessionId()) ? generateSessionId() : agent.getSessionId();
-        if (!sessionId.equals(agent.getSessionId())) {
-            agent.setSessionId(sessionId);
-            agent.setUpdatedAt(LocalDateTime.now());
-            agentMapper.update(agent);
-        }
-
-        int rounds = resolveContextRounds(
-                request.getContextRounds() != null ? request.getContextRounds() : agent.getContextRounds());
+        int rounds = resolveContextRounds(agent.getContextRounds());
         int historyLimit = rounds * 2;
         List<AgentMessage> history = historyLimit > 0
-                ? agentMessageMapper.selectRecentMessages(agentId, sessionId, historyLimit)
+                ? agentMessageMapper.selectRecentMessages(session.getSessionId(), historyLimit)
                 : Collections.emptyList();
         Collections.reverse(history);
 
         AgentMessage userMessage = new AgentMessage();
-        userMessage.setAgentId(agentId);
-        userMessage.setSessionId(sessionId);
+        userMessage.setSessionId(session.getSessionId());
         userMessage.setRole("user");
         userMessage.setContent(request.getMessage());
         userMessage.setCreatedAt(LocalDateTime.now());
         agentMessageMapper.insert(userMessage);
 
-        List<Map<String, String>> llmMessages = buildLlmMessages(agent, history, userMessage);
-        String aiResponse = llmService.generateResponse(llmMessages, agent.getModel());
+        Map<String, Object> proxyPayload = buildAiAgentPayload(agent, session.getSessionId(), request, history);
 
-        AgentMessage assistantMessage = new AgentMessage();
-        assistantMessage.setAgentId(agentId);
-        assistantMessage.setSessionId(sessionId);
-        assistantMessage.setRole("assistant");
-        assistantMessage.setContent(aiResponse);
-        assistantMessage.setCreatedAt(LocalDateTime.now());
-        agentMessageMapper.insert(assistantMessage);
-
-        AgentChatResponse response = new AgentChatResponse();
-        response.setRole("assistant");
-        response.setContent(aiResponse);
-        return response;
+        SseEmitter emitter = new SseEmitter(0L);
+        CompletableFuture.runAsync(() -> forwardStream(proxyPayload, session.getSessionId(), emitter));
+        return emitter;
     }
 
     @Override
-    public List<AgentMessageDTO> listMessages(String agentId, Integer limit) {
-        Agent agent = requireAgent(agentId);
+    public List<AgentMessageDTO> listMessages(String agentId, String sessionId, Integer limit) {
+        requireAgent(agentId);
+        AgentSession session = requireSession(sessionId, agentId);
         int safeLimit = (limit == null || limit <= 0) ? 100 : Math.min(limit, 200);
-        List<AgentMessage> messages = agentMessageMapper.selectLatestMessages(agent.getId(), safeLimit);
+        List<AgentMessage> messages = agentMessageMapper.selectLatestMessages(session.getSessionId(), safeLimit);
         Collections.reverse(messages);
         return messages.stream().map(this::toMessageDTO).collect(Collectors.toList());
+    }
+
+    private Map<String, Object> buildAiAgentPayload(Agent agent,
+                                                   String sessionId,
+                                                   AgentChatRequest request,
+                                                   List<AgentMessage> history) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("message", request.getMessage());
+        payload.put("model_id", resolveModelName(agent));
+        payload.put("session_id", sessionId);
+
+        String systemPrompt = firstNonBlank(agent.getProfileMd(), agent.getPrompt(), DEFAULT_SYSTEM_PROMPT);
+        if (!isBlank(systemPrompt)) {
+            payload.put("system_prompt", systemPrompt);
+        }
+
+        List<String> plugins = deserializePlugins(agent.getPlugins());
+        List<String> knowledgeBases = deserializeKnowledgeBase(agent.getKnowledgeBase());
+        payload.put("tools", plugins);
+        payload.put("knowledge_bases", knowledgeBases);
+        payload.put("history", buildHistoryPayload(history));
+        return payload;
+    }
+
+    private String resolveModelName(Agent agent) {
+        if (!isBlank(agent.getModel())) {
+            return agent.getModel();
+        }
+        return DEFAULT_MODEL;
+    }
+
+    private List<Map<String, String>> buildHistoryPayload(List<AgentMessage> history) {
+        if (history == null || history.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return history.stream()
+                .map(message -> {
+                    Map<String, String> map = new HashMap<>();
+                    map.put("role", message.getRole());
+                    map.put("content", message.getContent());
+                    return map;
+                })
+                .collect(Collectors.toList());
+    }
+
+    private void forwardStream(Map<String, Object> proxyPayload,
+                               String sessionId,
+                               SseEmitter emitter) {
+        StringBuilder assistantBuilder = new StringBuilder();
+        try {
+            aiAgentClient.streamChat(proxyPayload, data -> handleStreamChunk(data, emitter, assistantBuilder));
+            saveAssistantMessage(sessionId, assistantBuilder.toString());
+            emitter.complete();
+        } catch (Exception ex) {
+            handleStreamError(emitter, ex);
+        }
+    }
+
+    private void handleStreamChunk(String data,
+                                   SseEmitter emitter,
+                                   StringBuilder assistantBuilder) {
+        try {
+            emitter.send(data, MediaType.TEXT_PLAIN);
+        } catch (IOException e) {
+            throw new RuntimeException("SSE发送失败", e);
+        }
+        if (!isDoneEvent(data)) {
+            appendAssistantContent(data, assistantBuilder);
+        }
+    }
+
+    private boolean isDoneEvent(String data) {
+        return data != null && STREAM_DONE_TOKEN.equalsIgnoreCase(data.trim());
+    }
+
+    private void appendAssistantContent(String data, StringBuilder buffer) {
+        if (buffer == null || isDoneEvent(data) || isBlank(data)) {
+            return;
+        }
+        try {
+            JsonNode node = objectMapper.readTree(data);
+            JsonNode contentNode = node.get("content");
+            if (contentNode != null && !contentNode.isNull()) {
+                buffer.append(contentNode.asText());
+            }
+        } catch (Exception ignore) {
+            // 如果不是标准 JSON 片段，忽略即可
+        }
+    }
+
+    private void saveAssistantMessage(String sessionId, String content) {
+        if (isBlank(content)) {
+            return;
+        }
+        AgentMessage assistantMessage = new AgentMessage();
+        assistantMessage.setSessionId(sessionId);
+        assistantMessage.setRole("assistant");
+        assistantMessage.setContent(content);
+        assistantMessage.setCreatedAt(LocalDateTime.now());
+        agentMessageMapper.insert(assistantMessage);
+    }
+
+    private void handleStreamError(SseEmitter emitter, Exception ex) {
+        try {
+            Map<String, Object> errorPayload = new HashMap<>();
+            errorPayload.put("success", false);
+            errorPayload.put("error", ex.getMessage());
+            emitter.send(SseEmitter.event()
+                    .name("error")
+                    .data(errorPayload));
+        } catch (IOException ignored) {
+            // ignore
+        } finally {
+            emitter.completeWithError(ex);
+        }
     }
 
     private Agent requireAgent(String agentId) {
@@ -233,6 +413,20 @@ public class AgentServiceImpl implements AgentService {
             throw new RuntimeException("智能体不存在");
         }
         return agent;
+    }
+
+    private AgentSession requireSession(String sessionId, String agentId) {
+        if (isBlank(sessionId)) {
+            throw new RuntimeException("sessionId不能为空");
+        }
+        AgentSession session = agentSessionMapper.selectById(sessionId);
+        if (session == null) {
+            throw new RuntimeException("会话不存在");
+        }
+        if (agentId != null && !session.getAgentId().equals(agentId)) {
+            throw new RuntimeException("会话不属于当前智能体");
+        }
+        return session;
     }
 
     private void validateAgentName(String name) {
@@ -283,7 +477,29 @@ public class AgentServiceImpl implements AgentService {
         }
     }
 
+    private String serializeKnowledgeBase(List<String> knowledgeBase) {
+        if (knowledgeBase == null) {
+            return "[]";
+        }
+        try {
+            return objectMapper.writeValueAsString(knowledgeBase);
+        } catch (Exception e) {
+            throw new RuntimeException("知识库配置序列化失败", e);
+        }
+    }
+
     private List<String> deserializePlugins(String json) {
+        if (isBlank(json)) {
+            return Collections.emptyList();
+        }
+        try {
+            return objectMapper.readValue(json, new TypeReference<List<String>>() {});
+        } catch (Exception e) {
+            return Collections.emptyList();
+        }
+    }
+
+    private List<String> deserializeKnowledgeBase(String json) {
         if (isBlank(json)) {
             return Collections.emptyList();
         }
@@ -305,8 +521,8 @@ public class AgentServiceImpl implements AgentService {
         dto.setContextRounds(agent.getContextRounds());
         dto.setMaxTokens(agent.getMaxTokens());
         dto.setPlugins(deserializePlugins(agent.getPlugins()));
+        dto.setKnowledgeBase(deserializeKnowledgeBase(agent.getKnowledgeBase()));
         dto.setStatus(agent.getStatus());
-        dto.setSessionId(agent.getSessionId());
         dto.setCreatedAt(agent.getCreatedAt());
         dto.setUpdatedAt(agent.getUpdatedAt());
         return dto;
@@ -315,7 +531,6 @@ public class AgentServiceImpl implements AgentService {
     private AgentMessageDTO toMessageDTO(AgentMessage message) {
         AgentMessageDTO dto = new AgentMessageDTO();
         dto.setId(message.getId());
-        dto.setAgentId(message.getAgentId());
         dto.setSessionId(message.getSessionId());
         dto.setRole(message.getRole());
         dto.setContent(message.getContent());
@@ -323,24 +538,14 @@ public class AgentServiceImpl implements AgentService {
         return dto;
     }
 
-    private List<Map<String, String>> buildLlmMessages(Agent agent,
-                                                       List<AgentMessage> history,
-                                                       AgentMessage latestUserMessage) {
-        List<Map<String, String>> messages = new ArrayList<>();
-        String systemPrompt = firstNonBlank(agent.getProfileMd(), agent.getPrompt(), DEFAULT_SYSTEM_PROMPT);
-        messages.add(messageOf("system", systemPrompt));
-        for (AgentMessage message : history) {
-            messages.add(messageOf(message.getRole(), message.getContent()));
-        }
-        messages.add(messageOf(latestUserMessage.getRole(), latestUserMessage.getContent()));
-        return messages;
-    }
-
-    private Map<String, String> messageOf(String role, String content) {
-        Map<String, String> map = new HashMap<>();
-        map.put("role", role);
-        map.put("content", content);
-        return map;
+    private AgentSessionDTO toSessionDTO(AgentSession session) {
+        AgentSessionDTO dto = new AgentSessionDTO();
+        dto.setSessionId(session.getSessionId());
+        dto.setAgentId(session.getAgentId());
+        dto.setName(session.getName());
+        dto.setCreatedAt(session.getCreatedAt());
+        dto.setUpdatedAt(session.getUpdatedAt());
+        return dto;
     }
 
     private String generateAgentId() {

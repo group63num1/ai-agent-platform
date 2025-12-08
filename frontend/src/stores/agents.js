@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { getAgents, getAgent, createAgent, updateAgent, deleteAgent, publishAgent } from '@/api/agent'
+import { getAgents, getAgent, createAgent, updateAgent, deleteAgent, publishAgent, unpublishAgent, getAgentSessions, deleteAgentSession } from '@/api/agent'
 
 export const useAgentsStore = defineStore('agents', () => {
   const list = ref([])
@@ -18,10 +18,10 @@ export const useAgentsStore = defineStore('agents', () => {
       const data = await getAgents(params)
       // 兼容返回结构：若后端直接返回数组或 {items,total}
       if (Array.isArray(data)) {
-        list.value = data
+        list.value = data.filter(a => a.status !== 'published')
         total.value = data.length
       } else if (data && typeof data === 'object') {
-        list.value = data.items || []
+        list.value = (data.items || []).filter(a => a.status !== 'published')
         total.value = data.total ?? list.value.length
       }
     } finally {
@@ -79,9 +79,46 @@ export const useAgentsStore = defineStore('agents', () => {
     publishing.value = true
     try {
       const result = await publishAgent(id)
+      // 发布后删除调试会话（按约定：删除所有该智能体会话）
+      try {
+        const sessions = await getAgentSessions(id)
+        const list = Array.isArray(sessions) ? sessions : (sessions?.items || [])
+        for (const s of list) {
+          if (s?.sessionId) {
+            await deleteAgentSession(id, s.sessionId)
+          }
+        }
+      } catch (e) {
+        console.warn('发布后清理会话失败：', e)
+      }
       const idx = list.value.findIndex(a => a.id === id)
       if (idx !== -1) list.value[idx] = { ...list.value[idx], status: 'published', ...result }
       if (current.value?.id === id) current.value = { ...current.value, status: 'published', ...result }
+      return result
+    } finally {
+      publishing.value = false
+    }
+  }
+
+  async function unpublish(id) {
+    publishing.value = true
+    try {
+      const result = await unpublishAgent(id)
+      // 下架时删除所有会话
+      try {
+        const sessions = await getAgentSessions(id)
+        const list = Array.isArray(sessions) ? sessions : (sessions?.items || [])
+        for (const s of list) {
+          if (s?.sessionId) {
+            await deleteAgentSession(id, s.sessionId)
+          }
+        }
+      } catch (e) {
+        console.warn('下架清理会话失败：', e)
+      }
+      const idx = list.value.findIndex(a => a.id === id)
+      if (idx !== -1) list.value[idx] = { ...list.value[idx], status: 'draft', ...result }
+      if (current.value?.id === id) current.value = { ...current.value, status: 'draft', ...result }
       return result
     } finally {
       publishing.value = false
@@ -103,5 +140,6 @@ export const useAgentsStore = defineStore('agents', () => {
     update,
     remove,
     publish
+    , unpublish
   }
 })

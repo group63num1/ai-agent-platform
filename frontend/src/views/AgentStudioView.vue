@@ -49,23 +49,55 @@
             <el-form-item label="最大回复长度">
               <el-input-number v-model="settings.maxTokens" :min="64" :max="4096" />
             </el-form-item>
-            <el-form-item label="插件选择">
-              <el-select
-                v-model="settings.plugins"
-                multiple
-                filterable
-                :loading="loadingPlugins"
-                placeholder="选择插件"
-                @visible-change="(v) => { if (v && pluginOptions.length === 0) fetchPlugins() }"
-              >
-                <el-option
-                  v-for="opt in pluginOptions"
-                  :key="opt.value"
-                  :label="opt.label"
-                  :value="opt.value"
-                />
-              </el-select>
-            </el-form-item>
+            <!-- 插件管理：用独立容器避免 el-form-item 收缩内容区 -->
+            <div class="w-full">
+              <div class="w-full border border-dashed border-gray-300 rounded p-3 text-sm">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2">
+                    <el-button text  @click="togglePlugins">
+                      <span v-if="!pluginsExpanded">&gt;</span>
+                      <span v-else>v</span>
+                    </el-button>
+                    <span class="text-gray-800">插件管理</span>
+                  </div>
+                  <el-button plain type="primary" size="small" @click="openAddPluginDialog">添加</el-button>
+                </div>
+                <div v-if="pluginsExpanded" class="mt-2 space-y-2">
+                  <div v-if="settings.plugins.length===0" class="text-gray-500">暂无插件</div>
+                  <div v-else class="space-y-1">
+                    <div v-for="(p, idx) in settings.plugins" :key="p" class="flex items-center justify-between">
+                      <span>{{ displayPluginLabel(p) }}</span>
+                      <el-button plain type="danger" size="small" @click="removePlugin(idx)">移除</el-button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 知识库管理：用独立容器避免 el-form-item 收缩内容区 -->
+            <div class="w-full">
+              <div class="w-full border border-dashed border-gray-300 rounded p-3 text-sm">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2">
+                    <el-button text  @click="toggleKBs">
+                      <span v-if="!kbsExpanded">&gt;</span>
+                      <span v-else>v</span>
+                    </el-button>
+                    <span class="text-gray-800">知识库管理</span>
+                  </div>
+                  <el-button plain type="primary" size="small" @click="openAddKBDialog">添加</el-button>
+                </div>
+                <div v-if="kbsExpanded" class="mt-2 space-y-2">
+                  <div v-if="settings.knowledgeBases.length===0" class="text-gray-500">暂无知识库</div>
+                  <div v-else class="space-y-1">
+                    <div v-for="(kb, idx) in settings.knowledgeBases" :key="kb" class="flex items-center justify-between">
+                      <span>{{ displayKBLabel(kb) }}</span>
+                      <el-button plain type="danger" size="small" @click="removeKB(idx)">移除</el-button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </el-form>
         </div>
       </el-card>
@@ -90,6 +122,30 @@
         </div>
       </el-card>
     </div>
+    <!-- 对话框区域 -->
+    <el-dialog v-model="addPluginDialogVisible" title="添加插件" width="50%">
+      <div class="space-y-2">
+        <div v-for="opt in pluginOptions" :key="opt.value" class="flex items-center justify-between py-1 px-2 border-b border-gray-100">
+          <span>{{ opt.label }}</span>
+          <el-button type="primary" size="small" @click="addPlugin(opt.value); addPluginDialogVisible=false">添加</el-button>
+        </div>
+      </div>
+      <template #footer>
+        <el-button plain @click="addPluginDialogVisible=false">关闭</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="addKBDialogVisible" title="添加知识库" width="50%">
+      <div class="space-y-2">
+        <div v-for="opt in kbOptions" :key="opt.value" class="flex items-center justify-between py-1 px-2 border-b border-gray-100">
+          <span>{{ opt.label }}</span>
+          <el-button type="primary" size="small" @click="addKB(opt.value); addKBDialogVisible=false">添加</el-button>
+        </div>
+      </div>
+      <template #footer>
+        <el-button plain @click="addKBDialogVisible=false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -98,10 +154,12 @@ import { onMounted, ref, reactive, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAgentsStore } from '@/stores/agents'
-import { updateAgent, getAgent } from '@/api/agent'
+import { updateAgent, getAgent, getAgentSessions, createAgentSession } from '@/api/agent'
 import { chatWithAgent, getAgentChatMessages } from '@/api/agent'
 import { ArrowLeft } from '@element-plus/icons-vue'
 import { getPlugins } from '@/api/plugins'
+import { getKnowledgeBasesList } from '@/api/agent'
+import { ElDialog } from 'element-plus'
 
 const route = useRoute()
 const router = useRouter()
@@ -115,7 +173,8 @@ const settings = reactive({
   model: 'hunyuan',
   contextRounds: 3,
   maxTokens: 512,
-  plugins: []
+  plugins: [],
+  knowledgeBases: []
 })
 const publishing = computed(() => store.publishing)
 
@@ -126,6 +185,11 @@ const localHistoryKey = `agent_chat_history_${agentId}`
 const FIXED_MODEL = 'deepseek-ai/DeepSeek-R1-Distill-Qwen-7B'
 const pluginOptions = ref([])
 const loadingPlugins = ref(false)
+const addPluginDialogVisible = ref(false)
+const kbOptions = ref([])
+const addKBDialogVisible = ref(false)
+const pluginsExpanded = ref(true)
+const kbsExpanded = ref(true)
 
 async function fetchPlugins() {
   loadingPlugins.value = true
@@ -147,9 +211,20 @@ onMounted(async () => {
   settings.contextRounds = a.contextRounds ?? settings.contextRounds
   settings.maxTokens = a.maxTokens ?? settings.maxTokens
   settings.plugins = a.plugins || []
+  settings.knowledgeBases = a.knowledgeBases || a.knowledge_base || []
 
   // 直接加载后端基于智能体的历史消息
   await loadHistory()
+  // 草稿进入工作台时，如无会话则自动创建调试会话
+  try {
+    const sessions = await getAgentSessions(agentId)
+    const list = Array.isArray(sessions) ? sessions : (sessions?.items || [])
+    if (!list || list.length === 0) {
+      await createAgentSession(agentId, { name: '调试会话' })
+    }
+  } catch (e) {
+    console.warn('进入工作台自动创建调试会话失败：', e)
+  }
 })
 
 async function loadHistory() {
@@ -182,7 +257,8 @@ async function saveAll() {
       model: settings.model,
       contextRounds: settings.contextRounds,
       maxTokens: settings.maxTokens,
-      plugins: settings.plugins
+      plugins: settings.plugins,
+      knowledgeBases: settings.knowledgeBases
     })
     ElMessage.success('已保存所有设置')
   } finally {
@@ -194,6 +270,8 @@ async function onPublish() {
   try {
     await store.publish(agentId)
     ElMessage.success('已发布')
+    // 发布后跳转到智能体管理页面
+    router.push({ name: 'agents' })
   } catch (e) {
     ElMessage.error(e.message || '发布失败')
   }
@@ -232,4 +310,41 @@ async function sendMessage() {
 function goBack() {
   router.push({ name: 'agents' })
 }
+
+// 插件管理逻辑
+function togglePlugins() { pluginsExpanded.value = !pluginsExpanded.value }
+function openAddPluginDialog() {
+  if (pluginOptions.value.length === 0) fetchPlugins()
+  addPluginDialogVisible.value = true
+}
+function displayPluginLabel(val) {
+  const found = pluginOptions.value.find(x => x.value === val)
+  return found ? found.label : val
+}
+function addPlugin(val) {
+  if (!settings.plugins.includes(val)) settings.plugins.push(val)
+}
+function removePlugin(idx) { settings.plugins.splice(idx, 1) }
+
+// 知识库管理逻辑（示例数据）
+function toggleKBs() { kbsExpanded.value = !kbsExpanded.value }
+function openAddKBDialog() { addKBDialogVisible.value = true }
+onMounted(async () => {
+  // 预加载知识库选项（启用的）
+  try {
+    const list = await getKnowledgeBasesList()
+    // 映射为 {label,value}
+    kbOptions.value = Array.isArray(list) ? list.map(name => ({ label: name, value: name })) : []
+  } catch (e) {
+    console.warn('加载知识库列表失败：', e)
+  }
+})
+function displayKBLabel(val) {
+  const found = kbOptions.value.find(x => x.value === val)
+  return found ? found.label : val
+}
+function addKB(val) {
+  if (!settings.knowledgeBases.includes(val)) settings.knowledgeBases.push(val)
+}
+function removeKB(idx) { settings.knowledgeBases.splice(idx, 1) }
 </script>

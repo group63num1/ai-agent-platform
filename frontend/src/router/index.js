@@ -3,7 +3,6 @@ import { createRouter, createWebHistory } from 'vue-router'
 const Login = () => import('@/views/LoginView.vue')
 const Home = () => import('@/views/HomeView.vue')
 const Dashboard = () => import('@/views/DashboardView.vue')
-const Apps = () => import('@/views/AppsView.vue')
 const Profile = () => import('@/views/ProfileView.vue')
 const Plugins = () => import('@/views/PluginsView.vue')
 const Chat = () => import('@/views/ChatView.vue')
@@ -12,6 +11,8 @@ const AgentDetail = () => import('@/views/AgentDetailView.vue')
 const AgentStudio = () => import('@/views/AgentStudioView.vue')
 const KnowledgeBases = () => import('@/views/KnowledgeBasesView.vue')
 const KnowledgeBaseDetail = () => import('@/views/KnowledgeBaseDetailView.vue')
+const Products = () => import('@/views/ProductsView.vue')
+const ProductChat = () => import('@/views/ProductChatView.vue')
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -42,14 +43,10 @@ const router = createRouter({
             requiresAuth: true
           }
         },
+        // 兼容旧的 /home/apps 子路由：移除应用模块后，重定向到首页
         {
           path: 'apps',
-          name: 'apps',
-          component: Apps,
-          meta: {
-            title: '应用列表',
-            requiresAuth: true
-          }
+          redirect: '/home'
         },
         {
           path: 'profile',
@@ -85,6 +82,24 @@ const router = createRouter({
           component: Agents,
           meta: {
             title: '智能体管理',
+            requiresAuth: true
+          }
+        },
+        {
+          path: 'products',
+          name: 'products',
+          component: Products,
+          meta: {
+            title: '产品管理',
+            requiresAuth: true
+          }
+        },
+        {
+          path: 'products/:id/chat',
+          name: 'productChat',
+          component: ProductChat,
+          meta: {
+            title: '产品聊天',
             requiresAuth: true
           }
         },
@@ -126,10 +141,10 @@ const router = createRouter({
         }
       ]
     },
-    // 兼容旧的 /apps 路径，重定向到 /home/apps
+    // 兼容旧的 /apps 路径：移除应用模块后，统一重定向到首页
     {
       path: '/apps',
-      redirect: '/home/apps'
+      redirect: '/home'
     }
   ],
 })

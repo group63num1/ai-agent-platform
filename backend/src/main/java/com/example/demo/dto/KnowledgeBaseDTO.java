@@ -5,21 +5,17 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-public class PluginSummaryDTO {
-    private Long id;
+public class KnowledgeBaseDTO {
+    private String kbId;
     private String name;
     private String description;
-    private String version;
-    private String status;
-    private String testStatus;
-    private String publishStatus;
+    private String category;
+    private Integer documentCount;
+    private Integer chunkCount;
+    private Long totalSize;
+    private String milvusCollection;
     private Boolean enabled;
-    private String iconUrl;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
-
-
-
-
 
