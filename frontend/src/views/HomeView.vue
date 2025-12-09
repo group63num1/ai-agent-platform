@@ -148,6 +148,16 @@ const loadMenus = async () => {
       });
     }
 
+    // 知识库管理菜单始终存在
+    const hasKBMenu = transformed.some(item => item.path === '/home/knowledge-bases');
+    if (!hasKBMenu) {
+      transformed.splice(1, 0, {
+        title: '知识库管理',
+        path: '/home/knowledge-bases',
+        icon: iconMap.Grid
+      });
+    }
+
     // 确保包含智能体管理菜单（后端未返回时补充）
     const hasAgentsMenu = transformed.some(item => item.path === '/home/agents');
     if (!hasAgentsMenu) {
@@ -174,6 +184,8 @@ const loadMenus = async () => {
     ElMessage.error('加载菜单失败: ' + (error.message || '未知错误'))
     menuList.value = [
       { title: '首页', path: '/home', icon: iconMap.House },
+      { title: '应用管理', path: '/home/apps', icon: iconMap.Grid },
+      { title: '知识库管理', path: '/home/knowledge-bases', icon: iconMap.Grid },
       { title: '插件管理', path: '/home/plugins', icon: iconMap.Setting },
       { title: '智能体管理', path: '/home/agents', icon: iconMap.Grid },
       { title: '产品管理', path: '/home/products', icon: iconMap.OfficeBuilding },
