@@ -1,28 +1,28 @@
 """
-FastAPI应用 - Python端API服务器
-接收来自Java后端的HTTP请求，处理后返回响应
+FastAPI应用 - 简化版，只保留9个核心接口
+1个chat接口 + 4个tool接口 + 4个知识库接口
 """
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from typing import Dict, Any, Optional, List
-from datetime import datetime
+from fastapi.responses import StreamingResponse
+from typing import List, Optional
 import logging
+import uuid
+import json
+from datetime import datetime
 
 from app.models import (
     ChatRequest,
     ChatResponse,
-    RAGRequest,
-    RAGResponse,
-    ModelCreateRequest,
-    ModelUpdateRequest,
-    PluginCreateRequest,
-    PluginUpdateRequest,
-    PluginSyncRequest,
+    ToolCreateRequest,
+    ToolUpdateRequest,
+    KnowledgeBaseCreateRequest,
+    KnowledgeBaseUpdateRequest,
+    KnowledgeBaseQueryRequest,
 )
-from core.model_registry import get_model_registry, ModelInfo
 from core import agent_service as agent_svc
+from core.model_registry import get_model_registry
 import config
 
 # 配置日志
@@ -44,29 +44,18 @@ from contextlib import asynccontextmanager
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
-    # 启动时
     try:
         logger.info("🚀 正在启动应用...")
 
-        # 1. 初始化数据库
-        from core.database import init_database, seed_default_models
+        # 初始化数据库
+        from core.database import init_database
 
         init_database()
         logger.info("✅ 数据库连接成功")
 
-        # 2. 初始化默认模型（如果需要）
-        seed_default_models()
-
-        # 3. 从数据库同步模型到内存
+        # 从数据库同步模型到内存
         model_registry.sync_from_database()
         logger.info(f"✅ 已加载 {len(model_registry.list())} 个模型")
-
-        # 4. 从数据库同步插件到内存
-        from core.plugin_registry import get_plugin_registry
-
-        plugin_registry = get_plugin_registry()
-        plugin_registry.sync_from_database()
-        logger.info(f"✅ 已加载 {len(plugin_registry.list())} 个插件")
 
         logger.info("✅ 应用启动完成")
 
@@ -76,15 +65,14 @@ async def lifespan(app: FastAPI):
         logger.error(f"❌ 应用启动失败: {e}")
         raise
 
-    # 关闭时
     logger.info("👋 应用正在关闭...")
 
 
 # 创建FastAPI应用
 app = FastAPI(
-    title="AI Agent Python API",
-    description="Python端AI Agent API服务，与Java后端通信",
-    version="1.0.0",
+    title="AI Agent API - 简化版",
+    description="9个核心接口：1个chat + 4个tool + 4个knowledge_base",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
@@ -98,692 +86,421 @@ app.add_middleware(
 )
 
 
-# ==================== 生命周期事件 ====================
-
-
-# ==================== API端点 ====================
-@app.get("/")
-async def root():
-    """根路径 - API信息"""
-    return {
-        "service": "AI Agent Python API",
-        "version": "1.0.0",
-        "status": "running",
-        "endpoints": {
-            "chat": "/api/chat",
-            "rag": "/api/rag",
-            "models": "/api/models",
-            "plugins_sync": "/api/plugins/sync",
-            "plugins": "/api/plugins",
-            "batch": "/api/batch",
-            "health": "/health",
-        },
-    }
-
-
-@app.get("/health")
-async def health_check():
-    """健康检查"""
-    try:
-        from core.database import get_session
-        from sqlalchemy import text
-
-        # 测试数据库连接
-        with get_session() as session:
-            session.execute(text("SELECT 1"))
-        db_status = "connected"
-    except Exception as e:
-        logger.error(f"数据库连接检查失败: {e}")
-        db_status = "disconnected"
-
-    return {
-        "status": "healthy",
-        "database": db_status,
-        "timestamp": datetime.now().isoformat(),
-    }
-
-
-# ==================== 对话接口 ====================
+# ==================== 1. Chat 接口 ====================
 
 
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
     """
-    对话接口 - 纯粹的 AI 推理服务
-
-    请求体:
-    {
-        "message": "今天天气怎么样？",
-        "modelId": "qwen-plus",
-        "systemPrompt": "你是一个专业的助手",
-        "pluginNames": ["weather_query"],
-        "pluginParams": {
-            "weather_query": {
-                "user_id": "user123",
-                "token": "temp_token_xxx"
-            }
-        },
-        "enableRag": true,
-        "history": [{"role": "user", "content": "..."}]
-    }
-
-    响应:
-    {
-        "question": "今天天气怎么样？",
-        "answer": "AI回答...",
-        "success": true,
-        "model": "qwen-plus",
-        "metadata": {...}
-    }
+    对话接口 - 核心接口（流式输出）
+    支持指定 tools 和 knowledgeBases
     """
-    try:
-        logger.info(
-            f"收到Chat请求: model={request.modelId}, message={request.message[:50]}"
-        )
 
-        # 如果有动态插件JSON，先注册
-        if request.pluginsJson:
-            agent_svc.register_plugins_json(request.pluginsJson)
+    async def generate():
+        try:
+            logger.info(f"开始流式对话: message={request.message[:50]}...")
+            chunk_count = 0
 
-        # 调用Agent服务
-        result = agent_svc.chat(
-            request.message,
-            session_id="default",  # 无状态服务
-            model=request.modelId,
-            system_prompt=request.systemPrompt,
-            history=request.history,
-            enable_rag=request.enableRag,
-            enable_plugins=bool(request.pluginNames),
-            allowed_plugins=request.pluginNames,
-            plugin_params=request.pluginParams,  # 传递运行时参数
-        )
+            # 调用 agent_service（流式）
+            for chunk in agent_svc.chat_stream(
+                message=request.message,
+                session_id=request.session_id,
+                model=request.model_id,
+                tools=request.tools or [],
+                knowledge_bases=request.knowledge_bases or [],
+                system_prompt=request.system_prompt,
+                history=request.history,
+            ):
+                chunk_count += 1
+                chunk_content = chunk.get("content", "")
+                logger.debug(
+                    f"生成 chunk #{chunk_count}: content_len={len(chunk_content)}, done={chunk.get('done')}"
+                )
+                # SSE 格式
+                yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
 
-        # 构造响应
-        response = ChatResponse(
-            question=request.message,
-            answer=result["reply"],
-            success=True,
-            model=request.modelId,
-            metadata={
-                "history_length": result.get("history_length", 0),
-                "has_summary": result.get("has_summary", False),
-            },
-        )
+            # 结束标记
+            logger.info(f"流式对话完成，共生成 {chunk_count} 个 chunk")
+            yield "data: [DONE]\n\n"
 
-        return response.dict()
+        except Exception as e:
+            logger.error(f"Chat流式输出失败: {e}", exc_info=True)
+            error_data = {"error": str(e), "success": False}
+            yield f"data: {json.dumps(error_data, ensure_ascii=False)}\n\n"
 
-    except Exception as e:
-        logger.error(f"Chat接口错误: {str(e)}")
-        return ChatResponse(
-            question=request.message,
-            answer="",
-            success=False,
-            error=str(e),
-            model=request.modelId,
-        ).dict()
+    return StreamingResponse(generate(), media_type="text/event-stream")
 
 
-# ==================== RAG接口 ====================
+# ==================== 2-5. Tool 接口 ====================
 
 
-@app.post("/api/rag")
-async def rag_search(request: RAGRequest):
+@app.post("/api/tools")
+async def create_tool(body: dict):
     """
-    RAG检索接口 - 在知识库中检索相关信息
+    创建工具 - 接收 user_id 和 OpenAPI JSON
 
-    请求体:
+    请求体格式:
     {
-        "query": "什么是深度学习？",
-        "topK": 5
-    }
-
-    响应:
-    {
-        "query": "什么是深度学习？",
-        "results": [...],
-        "success": true
+        "user_id": "user123",
+        "openapi": { ... OpenAPI JSON文件 ... }
     }
     """
     try:
-        logger.info(f"收到RAG请求: query={request.query[:50]}")
+        if not isinstance(body, dict):
+            raise HTTPException(status_code=400, detail="请求体必须是JSON对象")
 
-        # 调用RAG服务
-        result = agent_svc.rag_search(request.query, "default", k=request.topK)
+        user_id = body.get("user_id")
+        openapi_json = body.get("openapi")
 
-        # 构造响应
-        response = RAGResponse(
-            query=request.query,
-            results=result.get("results", []),
-            success=True,
+        if not user_id:
+            raise HTTPException(status_code=400, detail="缺少 user_id 字段")
+        if not openapi_json:
+            raise HTTPException(status_code=400, detail="缺少 openapi 字段")
+
+        from core.database import (
+            create_tool,
+            parse_openapi_to_tool_fields,
+            delete_tool,
+            list_tools,
         )
 
-        return response.dict()
+        # 解析 OpenAPI JSON
+        tool_fields_list = parse_openapi_to_tool_fields(openapi_json)
 
-    except Exception as e:
-        logger.error(f"RAG接口错误: {str(e)}")
-        return RAGResponse(
-            query=request.query,
-            results=[],
-            success=False,
-            error=str(e),
-        ).dict()
+        if not tool_fields_list:
+            raise HTTPException(
+                status_code=400, detail="OpenAPI 中未找到有效的路径定义"
+            )
 
+        # 先清理该用户的旧工具（避免重复 key）- 通过 tool_id 前缀判断
+        existing_tools = list_tools()
+        for tool in existing_tools:
+            if tool["tool_id"].startswith(f"{user_id}_"):
+                delete_tool(tool["tool_id"])
 
-# ==================== 模型管理 ====================
+        # 为每个端点创建工具
+        created_tools = []
+        for tool_fields in tool_fields_list:
+            # tool_id = user_id + 工具英文名（operationId 本身就是唯一的）
+            tool_id = f"{user_id}_{tool_fields['operation_id']}"
 
+            tool = create_tool(
+                tool_id=tool_id,
+                name=tool_fields["name"],
+                purpose=tool_fields["purpose"],
+                version=tool_fields["version"],
+                call_method=tool_fields["call_method"],
+                parameters=tool_fields["parameters"],
+                user_settings={},  # 初始为空，用户可以通过更新接口设置参数值
+            )
+            created_tools.append({"tool_id": tool_id, "name": tool_fields["name"]})
 
-@app.get("/api/models")
-async def list_models(enabled_only: bool = False):
-    """
-    获取所有模型列表
+        logger.info(f"✅ 为用户 {user_id} 创建了 {len(created_tools)} 个工具")
+        return {
+            "success": True,
+            "tools": created_tools,
+            "message": f"成功创建 {len(created_tools)} 个工具",
+        }
 
-    参数:
-    - enabled_only: 是否只返回启用的模型
-
-    响应:
-    {
-        "models": [
-            {
-                "model_id": "qwen-plus",
-                "display_name": "通义千问Plus",
-                "model": "qwen-plus",
-                "api_key": "sk-xxx",
-                "base_url": "https://...",
-                "enabled": true,
-                ...
-            }
-        ]
-    }
-    """
-    try:
-        models = model_registry.list(enabled_only=enabled_only)
-        return {"success": True, "models": models}
-    except Exception as e:
-        logger.error(f"获取模型列表失败: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/api/models/{model_id}")
-async def get_model(model_id: str):
-    """
-    获取指定模型详情
-
-    响应:
-    {
-        "success": true,
-        "model": {...}
-    }
-    """
-    try:
-        model_info = model_registry.get(model_id)
-        if not model_info:
-            raise HTTPException(status_code=404, detail=f"模型不存在: {model_id}")
-
-        from dataclasses import asdict
-
-        return {"success": True, "model": asdict(model_info)}
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"获取模型失败: {e}")
+        logger.error(f"创建工具失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/models")
-async def add_model(req: ModelCreateRequest):
+@app.put("/api/tools/{tool_id}")
+async def update_tool(tool_id: str, body: dict):
     """
-    添加新模型
+    更新工具 - 接收 tool_id 和要修改的字段
 
-    请求体:
+    请求体格式:
     {
-        "model_id": "gpt-4",
-        "display_name": "GPT-4",
-        "api_key": "sk-xxx",
-        "base_url": "https://api.openai.com/v1",
-        "model_type": "openai",
-        "enabled": true
-    }
-
-    响应:
-    {
-        "success": true,
-        "message": "模型添加成功"
+        "name": "新名称",  // 可选
+        "purpose": "新用途",  // 可选
+        "version": "1.0.1",  // 可选
+        ... 其他字段
     }
     """
     try:
-        from core.database import create_model
+        if not isinstance(body, dict):
+            raise HTTPException(status_code=400, detail="请求体必须是JSON对象")
 
-        # 写入数据库
-        create_model(
-            model_id=req.model_id,
-            display_name=req.display_name,
-            model=req.model_id,
-            api_key=req.api_key,
-            base_url=req.base_url,
-            enabled=req.enabled,
-            description=req.model_type,
-            max_tokens=req.max_tokens,
-            temperature=str(req.temperature) if req.temperature else None,
-        )
+        from core.database import update_tool as db_update_tool, get_tool
 
-        # 同步到内存
-        model_registry.sync_from_database()
+        # 检查工具是否存在
+        tool = get_tool(tool_id)
+        if not tool:
+            raise HTTPException(status_code=404, detail=f"工具不存在: {tool_id}")
 
-        logger.info(f"✅ 添加模型成功: {req.model_id}")
-        return {"success": True, "message": "模型添加成功"}
+        # 只允许更新特定字段
+        allowed_fields = {
+            "name",
+            "purpose",
+            "version",
+            "call_method",
+            "parameters",
+            "user_settings",
+        }
 
-    except Exception as e:
-        logger.error(f"添加模型失败: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.put("/api/models/{model_id}")
-async def update_model(model_id: str, req: ModelUpdateRequest):
-    """
-    更新模型配置
-
-    请求体: 需要更新的字段（可选）
-    {
-        "api_key": "new-key",
-        "enabled": false
-    }
-
-    响应:
-    {
-        "success": true,
-        "message": "模型更新成功"
-    }
-    """
-    try:
-        from core.database import update_model as db_update_model
-
-        # 构造更新参数（只更新非None的字段）
-        update_data = {k: v for k, v in req.dict().items() if v is not None}
+        update_data = {
+            k: v for k, v in body.items() if k in allowed_fields and v is not None
+        }
 
         if not update_data:
             raise HTTPException(status_code=400, detail="没有提供要更新的字段")
 
-        # 更新数据库
-        result = db_update_model(model_id, **update_data)
+        result = db_update_tool(tool_id, **update_data)
         if not result:
-            raise HTTPException(status_code=404, detail=f"模型不存在: {model_id}")
+            raise HTTPException(status_code=404, detail=f"更新失败: {tool_id}")
 
-        # 同步到内存
-        model_registry.sync_from_database()
-
-        logger.info(f"✅ 更新模型成功: {model_id}")
-        return {"success": True, "message": "模型更新成功"}
+        logger.info(f"✅ 更新工具: {tool_id}")
+        return {"success": True, "message": "工具更新成功"}
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"更新模型失败: {e}")
+        logger.error(f"更新工具失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.delete("/api/models/{model_id}")
-async def delete_model(model_id: str):
+@app.delete("/api/tools/{tool_id}")
+async def delete_tool(tool_id: str):
     """
-    删除模型
-
-    响应:
-    {
-        "success": true,
-        "message": "模型删除成功"
-    }
+    删除工具 - 根据 tool_id 删除
     """
     try:
-        from core.database import delete_model as db_delete_model
+        from core.database import delete_tool as db_delete_tool
 
-        # 从数据库删除
-        ok = db_delete_model(model_id)
+        ok = db_delete_tool(tool_id)
         if not ok:
-            raise HTTPException(status_code=404, detail=f"模型不存在: {model_id}")
+            raise HTTPException(status_code=404, detail=f"工具不存在: {tool_id}")
 
-        # 从内存移除
-        model_registry.remove(model_id)
-
-        logger.info(f"✅ 删除模型成功: {model_id}")
-        return {"success": True, "message": "模型删除成功"}
+        logger.info(f"✅ 删除工具: {tool_id}")
+        return {"success": True, "message": "工具删除成功"}
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"删除模型失败: {e}")
+        logger.error(f"删除工具失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ==================== 插件管理 ====================
+# ==================== 6-9. KnowledgeBase 接口 ====================
 
 
-@app.post("/api/plugins")
-async def add_plugin(req: PluginCreateRequest):
+@app.post("/api/knowledge-bases")
+async def create_knowledge_base_api(req: KnowledgeBaseCreateRequest):
     """
-    添加插件 (OpenAPI 3.0 规范)
+    创建知识库
 
-    请求体:
-    {
-        "plugin_name": "weather_query",
-        "description": "查询天气插件",
-        "openapi_spec": { OpenAPI 3.0 完整规范 },
-        "auth_type": "none",       # "none", "bearer", "apikey"
-        "auth_config": {"token": "xxx"}  # 认证配置
-    }
-
-    响应:
-    {
-        "success": true,
-        "plugin_id": "uuid-xxx"
-    }
+    - 接收文件列表、chunking配置等参数
+    - 自动向量化并存储到 Milvus
+    - 返回知识库信息
     """
     try:
-        from core.database import create_plugin
-        import uuid
+        from core.knowledge_service import get_kb_service
 
-        # 验证 OpenAPI 规范
-        if "openapi" not in req.openapi_spec:
-            raise HTTPException(
-                status_code=400, detail="无效的 OpenAPI 规范: 缺少 'openapi' 字段"
+        kb_service = get_kb_service()
+
+        result = kb_service.create_knowledge_base(
+            user_id=req.user_id,
+            name=req.name,
+            files=req.files,
+            description=req.description or "",
+            chunking_method=req.chunking_method or "recursive",
+            chunk_size=req.chunk_size or 1000,
+            chunk_overlap=req.chunk_overlap or 200,
+            enabled=req.enabled if req.enabled is not None else True,
+        )
+
+        if result["success"]:
+            logger.info(f"✅ 创建知识库成功: {req.name} ({result['kb_id']})")
+            return result
+        else:
+            logger.error(f"❌ 创建知识库失败: {result.get('error')}")
+            raise HTTPException(status_code=500, detail=result.get("error"))
+
+    except Exception as e:
+        logger.error(f"创建知识库失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/knowledge-bases/{kb_id}/query")
+async def query_knowledge_bases(kb_id: str, req: KnowledgeBaseQueryRequest):
+    """
+    查询知识库内容
+
+    - kb_id: 知识库ID（路径参数）
+    - 若提供 query_text + similarity_threshold:
+      * similarity_threshold 存在且有匹配: 返回相似度 >= threshold 的前5条（包含 similarity 字段）
+      * 无匹配或未提供 threshold: 返回前20条
+    - 否则: 返回该知识库的前 20 个 chunk
+    """
+    try:
+        from core.knowledge_service import get_kb_service
+        from core.database import get_knowledge_base
+
+        # 验证知识库是否存在
+        kb_info = get_knowledge_base(kb_id)
+        if not kb_info:
+            raise HTTPException(status_code=404, detail=f"知识库不存在: {kb_id}")
+
+        kb_service = get_kb_service()
+
+        # 1. 如果有 query（必带阈值），先取 top5，再按阈值过滤，返回满足的（最多5条）
+        if req.query_text:
+            threshold = (
+                req.similarity_threshold
+                if req.similarity_threshold is not None
+                else 0.0
             )
 
-        # 生成插件ID
-        plugin_id = str(uuid.uuid4())
-
-        # 写入数据库
-        create_plugin(
-            plugin_id=plugin_id,
-            plugin_name=req.plugin_name,
-            description=req.description,
-            openapi_spec=req.openapi_spec,
-            enabled=True,
-            auth_type=req.auth_type,
-            auth_config=req.auth_config,
-        )
-
-        # 提取插件需要的配置参数
-        from core.plugins import extract_required_config
-
-        required_config = extract_required_config(
-            openapi_spec=req.openapi_spec,
-            auth_type=req.auth_type,
-        )
-
-        # 预解析工具信息（不实际创建工具，只是获取元数据）
-        tools_info = []
-        paths = req.openapi_spec.get("paths", {})
-        for path, path_item in paths.items():
-            for method, operation in path_item.items():
-                if method.lower() not in ["get", "post", "put", "delete", "patch"]:
-                    continue
-                operation_id = operation.get("operationId", f"{method}_{path}")
-                summary = operation.get("summary", "")
-                tools_info.append(
-                    {
-                        "name": operation_id,
-                        "description": summary,
-                        "method": method.upper(),
-                        "path": path,
-                    }
-                )
-
-        logger.info(
-            f"✅ 添加插件成功: {req.plugin_name} ({plugin_id}), 包含 {len(tools_info)} 个工具"
-            + (
-                f", 需要配置参数"
-                if required_config.get("needs_config")
-                else ", 无需配置"
+            results = kb_service.search_similar_content(
+                query_text=req.query_text,
+                kb_id=kb_id,
+                limit=5,
+                similarity_threshold=threshold,
             )
-        )
+
+            for result in results:
+                if "similarity" not in result and "similarity_score" in result:
+                    result["similarity"] = result.get("similarity_score")
+
+            return {
+                "success": True,
+                "count": len(results),
+                "results": results,
+                "query_text": req.query_text,
+                "similarity_threshold": threshold,
+                "kb_id": kb_id,
+            }
+
+        # 2. 无 query：返回该知识库的前 20 个 chunk（按内部顺序）
+        top_chunks = kb_service.get_top_chunks(kb_id=kb_id, limit=req.limit or 20)
 
         return {
             "success": True,
-            "plugin_id": plugin_id,
-            "plugin_name": req.plugin_name,
-            "tools_count": len(tools_info),
-            "tools": tools_info,
-            "required_config": required_config,  # 返回需要的配置参数
-            "message": (
-                f"插件添加成功！调用时需要传递参数: {[p['name'] for p in required_config['required_params']]}"
-                if required_config.get("needs_config")
-                else "插件添加成功！此插件无需配置参数，可直接调用。"
-            ),
+            "count": len(top_chunks),
+            "results": top_chunks,
+            "query_text": None,
+            "kb_id": kb_id,
         }
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"添加插件失败: {e}")
+        logger.error(f"查询知识库失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/api/plugins")
-async def list_plugins_api(
-    enabled_only: bool = False,
-):
+@app.put("/api/knowledge-bases/{kb_id}")
+async def update_knowledge_base(kb_id: str, req: KnowledgeBaseUpdateRequest):
     """
-    获取插件列表
+    更新知识库
 
-    参数:
-    - enabled_only: 只返回启用的插件
-
-    响应:
-    {
-        "success": true,
-        "plugins": [
-            {
-                "plugin_id": "uuid-xxx",
-                "plugin_name": "weather_query",
-                "description": "查询天气",
-                "enabled": true,
-                ...
-            }
-        ]
-    }
+    - 支持更新名称、描述、启用状态、chunking配置等
+    - 若更新了 files、chunking_method、chunk_size、chunk_overlap：
+      * 重新向量化整个知识库
+      * 删除旧的 Milvus 集合
+      * 创建新的向量存储
+    - 否则只更新数据库字段
     """
     try:
-        from core.database import list_plugins as db_list_plugins
+        from core.knowledge_service import get_kb_service
+        from core.database import get_knowledge_base
 
-        plugins = db_list_plugins(enabled_only=enabled_only)
-        # list_plugins 现在直接返回字典列表
-        return {"success": True, "plugins": plugins}
+        kb_service = get_kb_service()
 
-    except Exception as e:
-        logger.error(f"获取插件列表失败: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        # 检查知识库是否存在
+        kb_info = get_knowledge_base(kb_id)
+        if not kb_info:
+            raise HTTPException(status_code=404, detail=f"知识库不存在: {kb_id}")
 
-
-@app.get("/api/plugins/{plugin_id}")
-async def get_plugin_api(plugin_id: str):
-    """
-    获取插件详情
-
-    响应:
-    {
-        "success": true,
-        "plugin": {
-            "plugin_id": "uuid-xxx",
-            "plugin_name": "weather_query",
-            "openapi_spec": { ... },
-            ...
-        }
-    }
-    """
-    try:
-        from core.database import get_plugin
-
-        plugin = get_plugin(plugin_id)
-        if not plugin:
-            raise HTTPException(status_code=404, detail=f"插件不存在: {plugin_id}")
-
-        return {"success": True, "plugin": plugin}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"获取插件失败: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.put("/api/plugins/{plugin_id}")
-async def update_plugin_api(plugin_id: str, req: PluginUpdateRequest):
-    """
-    更新插件
-
-    请求体: 需要更新的字段（可选）
-    {
-        "plugin_name": "new_name",
-        "description": "新描述",
-        "enabled": false
-    }
-
-    响应:
-    {
-        "success": true,
-        "message": "插件更新成功"
-    }
-    """
-    try:
-        from core.database import update_plugin as db_update_plugin
-
-        # 构造更新参数（只更新非None的字段）
+        # 准备更新数据
         update_data = {k: v for k, v in req.dict().items() if v is not None}
-
         if not update_data:
             raise HTTPException(status_code=400, detail="没有提供要更新的字段")
 
-        # 更新数据库
-        result = db_update_plugin(plugin_id, **update_data)
-        if not result:
-            raise HTTPException(status_code=404, detail=f"插件不存在: {plugin_id}")
+        # 判断是否需要重新向量化
+        need_rebuild = any(
+            key in update_data
+            for key in ["files", "chunking_method", "chunk_size", "chunk_overlap"]
+        )
 
-        logger.info(f"✅ 更新插件成功: {plugin_id}")
-        return {"success": True, "message": "插件更新成功"}
+        if need_rebuild:
+            # 重新构建向量库
+            logger.info(f"🔄 检测到需要重新向量化的字段，开始重建知识库: {kb_id}")
+            result = kb_service.rebuild_knowledge_base(
+                kb_id=kb_id,
+                files=update_data.get("files"),
+                chunking_method=update_data.get("chunking_method"),
+                chunk_size=update_data.get("chunk_size"),
+                chunk_overlap=update_data.get("chunk_overlap"),
+                name=update_data.get("name"),
+                description=update_data.get("description"),
+                enabled=update_data.get("enabled"),
+            )
+
+            if not result["success"]:
+                raise HTTPException(status_code=500, detail=result.get("error"))
+
+            logger.info(f"✅ 知识库重建成功: {kb_id}")
+            return result
+        else:
+            # 只更新元数据
+            from core.database import update_knowledge_base as db_update_kb
+
+            result = db_update_kb(kb_id, **update_data)
+            if not result:
+                raise HTTPException(status_code=404, detail=f"知识库不存在: {kb_id}")
+
+            logger.info(f"✅ 更新知识库元数据: {kb_id}")
+            return {"success": True, "message": "知识库更新成功", "kb_id": kb_id}
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"更新插件失败: {e}")
+        logger.error(f"更新知识库失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.delete("/api/plugins/{plugin_id}")
-async def delete_plugin_api(plugin_id: str):
+@app.delete("/api/knowledge-bases/{kb_id}")
+async def delete_knowledge_base(kb_id: str):
     """
-    删除插件
+    删除知识库
 
-    响应:
-    {
-        "success": true,
-        "message": "插件删除成功"
-    }
+    - 同时删除向量数据库（Milvus集合）和关系数据库记录
+    - 返回 success 状态
     """
     try:
-        from core.database import delete_plugin as db_delete_plugin
+        from core.knowledge_service import get_kb_service
 
-        ok = db_delete_plugin(plugin_id)
-        if not ok:
-            raise HTTPException(status_code=404, detail=f"插件不存在: {plugin_id}")
+        kb_service = get_kb_service()
 
-        logger.info(f"✅ 删除插件成功: {plugin_id}")
-        return {"success": True, "message": "插件删除成功"}
+        # 删除知识库（包括 Milvus 集合和数据库记录）
+        result = kb_service.delete_knowledge_base(kb_id)
+
+        if not result["success"]:
+            if "不存在" in result.get("error", ""):
+                raise HTTPException(status_code=404, detail=result.get("error"))
+            else:
+                raise HTTPException(status_code=500, detail=result.get("error"))
+
+        logger.info(f"✅ 删除知识库成功: {kb_id}")
+        return result
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"删除插件失败: {e}")
+        logger.error(f"删除知识库失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ==================== 批量处理 ====================
+# ==================== 健康检查 ====================
 
 
-@app.post("/api/batch")
-async def batch_process(requests: List[ChatRequest]):
-    """
-    批量处理接口 - 批量处理多个对话请求
-
-    请求体:
-    {
-        "requests": [request1, request2, ...]
-    }
-
-    响应:
-    {
-        "results": [response1, response2, ...],
-        "total": 2,
-        "success_count": 2,
-        "failure_count": 0
-    }
-    """
-    try:
-        logger.info(f"收到批量请求: 数量={len(requests)}")
-
-        responses = []
-        success_count = 0
-        failure_count = 0
-
-        for req in requests:
-            try:
-                # 如果有动态插件JSON，先注册
-                if req.pluginsJson:
-                    agent_svc.register_plugins_json(req.pluginsJson)
-
-                # 调用Agent服务
-                result = agent_svc.chat(
-                    req.message,
-                    session_id="default",
-                    model=req.modelId,
-                    system_prompt=req.systemPrompt,
-                    history=req.history,
-                    enable_rag=req.enableRag,
-                    enable_plugins=bool(req.pluginNames),
-                    allowed_plugins=req.pluginNames,
-                )
-
-                response = ChatResponse(
-                    question=req.message,
-                    answer=result["reply"],
-                    success=True,
-                    model=req.modelId,
-                    metadata={
-                        "history_length": result.get("history_length", 0),
-                    },
-                )
-                success_count += 1
-
-            except Exception as e:
-                logger.error(f"批量处理单个请求失败: {str(e)}")
-                response = ChatResponse(
-                    question=req.message,
-                    answer="",
-                    success=False,
-                    error=str(e),
-                    model=req.modelId,
-                )
-                failure_count += 1
-
-            responses.append(response.dict())
-
-        return {
-            "results": responses,
-            "total": len(requests),
-            "success_count": success_count,
-            "failure_count": failure_count,
-        }
-
-    except Exception as e:
-        logger.error(f"批量处理错误: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# ==================== 异常处理 ====================
-
-
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    """全局异常处理"""
-    logger.error(f"未处理的异常: {str(exc)}")
-    return JSONResponse(
-        status_code=500,
-        content={"success": False, "error": str(exc), "message": "服务器内部错误"},
-    )
+@app.get("/health")
+async def health_check():
+    """健康检查"""
+    return {"status": "ok", "timestamp": datetime.now().isoformat()}

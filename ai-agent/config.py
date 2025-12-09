@@ -35,11 +35,12 @@ DATABASE_MAX_OVERFLOW: int = int(os.getenv("DATABASE_MAX_OVERFLOW", "10"))
 JAVA_BACKEND_URL: str = os.getenv("JAVA_BACKEND_URL", "http://localhost:8080")
 JAVA_BACKEND_TIMEOUT: int = int(os.getenv("JAVA_BACKEND_TIMEOUT", "30"))
 
-# ==================== RAG 配置 ====================
-CORPUS_PATH: str = os.getenv("CORPUS_PATH", "./corpus")
-CHUNK_SIZE: int = int(os.getenv("CHUNK_SIZE", "1000"))
-CHUNK_OVERLAP: int = int(os.getenv("CHUNK_OVERLAP", "200"))
-RETRIEVAL_K: int = int(os.getenv("RETRIEVAL_K", "3"))
+# ==================== Milvus 向量数据库配置 ====================
+MILVUS_HOST: str = os.getenv("MILVUS_HOST", "127.0.0.1")
+MILVUS_PORT: int = int(os.getenv("MILVUS_PORT", "19530"))
+MILVUS_ALIAS: str = os.getenv("MILVUS_ALIAS", "default")
+MILVUS_COLLECTION_NAME: str = os.getenv("MILVUS_COLLECTION_NAME", "knowledge_base")
+MILVUS_ENABLE: bool = os.getenv("MILVUS_ENABLE", "true").lower() == "true"
 
 # ==================== Agent 配置 ====================
 MAX_ITERATIONS: int = int(os.getenv("MAX_ITERATIONS", "5"))
@@ -80,9 +81,6 @@ def validate_config() -> tuple[bool, Optional[str]]:
         if not DATABASE_USER or not DATABASE_NAME:
             return False, "数据库用户名和数据库名不能为空"
 
-    if not CORPUS_PATH:
-        return False, "RAG 语料库路径不能为空"
-
     return True, None
 
 
@@ -97,4 +95,3 @@ if __name__ == "__main__":
     print(f"📊 数据库类型: {DATABASE_TYPE}")
     print(f"📊 数据库URL: {get_database_url()}")
     print(f"🌐 服务地址: {HOST}:{PORT}")
-    print(f"📁 语料库路径: {CORPUS_PATH}")

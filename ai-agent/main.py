@@ -27,7 +27,6 @@ if __name__ == "__main__":
     print(f"📖 API文档: http://{config.HOST}:{config.PORT}/docs")
     print(f"❤️  健康检查: http://{config.HOST}:{config.PORT}/health")
     print(f"🗄️  数据库类型: {config.DATABASE_TYPE}")
-    print(f"📁 语料库路径: {config.CORPUS_PATH}")
     print("=" * 60)
 
     # 启动FastAPI服务器

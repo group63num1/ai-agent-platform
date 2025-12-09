@@ -21,7 +21,16 @@ class ModelInfo:
     enabled: bool = True
     description: Optional[str] = None
     max_tokens: Optional[int] = None
-    temperature: Optional[str] = None
+    temperature: Optional[float] = None
+    top_p: Optional[float] = None
+    top_k: Optional[int] = None
+    frequency_penalty: Optional[float] = None
+    presence_penalty: Optional[float] = None
+    stop_sequences: Optional[List[str]] = None
+    stream: Optional[bool] = True
+    timeout: Optional[int] = None
+    retry_max_attempts: Optional[int] = None
+    retry_backoff_factor: Optional[int] = None
 
 
 class ModelRegistry:
@@ -66,8 +75,17 @@ class ModelRegistry:
                     base_url=db_model["base_url"],
                     enabled=db_model["enabled"],
                     description=db_model["description"],
-                    max_tokens=db_model["max_tokens"],
-                    temperature=db_model["temperature"],
+                    max_tokens=db_model.get("max_tokens"),
+                    temperature=db_model.get("temperature"),
+                    top_p=db_model.get("top_p"),
+                    top_k=db_model.get("top_k"),
+                    frequency_penalty=db_model.get("frequency_penalty"),
+                    presence_penalty=db_model.get("presence_penalty"),
+                    stop_sequences=db_model.get("stop_sequences"),
+                    stream=db_model.get("stream", True),
+                    timeout=db_model.get("timeout"),
+                    retry_max_attempts=db_model.get("retry_max_attempts"),
+                    retry_backoff_factor=db_model.get("retry_backoff_factor"),
                 )
                 self._models[model_info.model_id] = model_info
 
