@@ -9,6 +9,8 @@ const Chat = () => import('@/views/ChatView.vue')
 const Agents = () => import('@/views/AgentsView.vue')
 const AgentDetail = () => import('@/views/AgentDetailView.vue')
 const AgentStudio = () => import('@/views/AgentStudioView.vue')
+const KnowledgeBases = () => import('@/views/KnowledgeBasesView.vue')
+const KnowledgeBaseDetail = () => import('@/views/KnowledgeBaseDetailView.vue')
 const Products = () => import('@/views/ProductsView.vue')
 const ProductChat = () => import('@/views/ProductChatView.vue')
 
@@ -116,6 +118,24 @@ const router = createRouter({
           component: AgentDetail,
           meta: {
             title: '智能体详情',
+            requiresAuth: true
+          }
+        },
+        {
+          path: 'knowledge-bases',
+          name: 'knowledgeBases',
+          component: KnowledgeBases,
+          meta: {
+            title: '知识库管理',
+            requiresAuth: true
+          }
+        },
+        {
+          path: 'knowledge-bases/:id',
+          name: 'knowledgeBaseDetail',
+          component: KnowledgeBaseDetail,
+          meta: {
+            title: '知识库详情',
             requiresAuth: true
           }
         }
