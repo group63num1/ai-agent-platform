@@ -11,7 +11,7 @@ from datetime import datetime
 import json
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.embeddings import FastEmbedEmbeddings
 
 from core.milvus_client import MilvusClient
 from core.database import get_session, KnowledgeBaseDB, get_knowledge_base
@@ -35,21 +35,11 @@ class KnowledgeBaseService:
         if self.embeddings is not None:
             return
 
-        logger.info(f"⏳ 正在加载 embedding 模型...")
+        logger.info("⏳ 正在加载 embedding 模型 (FastEmbed - 轻量版)...")
         try:
-            # 使用 knowledge 目录下的 e5 模型（HuggingFace cache 格式）
-            e5_model_path = Path("knowledge/models--intfloat--e5-base-v2")
-
-            if e5_model_path.exists():
-                self.embeddings = HuggingFaceEmbeddings(model_name=str(e5_model_path))
-                logger.info(f"✅ 已加载 e5 模型: {e5_model_path}")
-            else:
-                # 如果本地没有 e5 模型，使用在线的 all-MiniLM-L6-v2
-                self.embeddings = HuggingFaceEmbeddings(
-                    model_name="sentence-transformers/all-MiniLM-L6-v2"
-                )
-                logger.info("✅ 已加载 all-MiniLM-L6-v2 模型（在线）")
-
+            # 轻量级 ONNX 模型，避免安装 torch
+            self.embeddings = FastEmbedEmbeddings(model_name="BAAI/bge-small-zh-v1.5")
+            logger.info("✅ 已加载 FastEmbed 模型: BAAI/bge-small-zh-v1.5")
         except Exception as e:
             logger.error(f"❌ 加载 embedding 模型失败: {e}")
             raise
@@ -283,7 +273,7 @@ class KnowledgeBaseService:
         try:
             # 1. 生成知识库 ID
             kb_id = self.generate_kb_id(user_id, name)
-            logger.info(f"📝 创建知识库: {kb_id}")
+            logger.info(f"������ 创建知识库: {kb_id}")
 
             # 2. 保存上传的文件
             file_paths = self.save_uploaded_files(kb_id, files)
@@ -454,7 +444,7 @@ class KnowledgeBaseService:
                 return []
 
             logger.info(
-                f"🔍 在 {len(kb_ids)} 个知识库中搜索前 {limit} 条: {query_text[:50]}..."
+                f"������ 在 {len(kb_ids)} 个知识库中搜索前 {limit} 条: {query_text[:50]}..."
             )
 
             retriever = MilvusRetriever()
@@ -582,7 +572,7 @@ class KnowledgeBaseService:
             if not kb:
                 return {"success": False, "error": f"知识库不存在: {kb_id}"}
 
-            logger.info(f"🔄 开始重构知识库: {kb_id}")
+            logger.info(f"������ 开始重构知识库: {kb_id}")
 
             # 2. 确定新的参数（如果未提供则使用旧值）
             new_chunking_method = chunking_method or kb.chunking_method
@@ -597,7 +587,7 @@ class KnowledgeBaseService:
                     import shutil
 
                     shutil.rmtree(old_dir)
-                    logger.info(f"🗑️  已删除旧文件目录")
+                    logger.info(f"������️  已删除旧文件目录")
 
                 file_paths = self.save_uploaded_files(kb_id, files)
                 if not file_paths:
@@ -634,7 +624,7 @@ class KnowledgeBaseService:
             milvus_client = MilvusClient(collection_name=old_milvus_collection)
             try:
                 milvus_client.drop_collection()
-                logger.info(f"🗑️  已删除旧的 Milvus 集合: {old_milvus_collection}")
+                logger.info(f"������️  已删除旧的 Milvus 集合: {old_milvus_collection}")
             except Exception as e:
                 logger.warning(f"⚠️  删除旧集合失败（可能不存在）: {e}")
 
@@ -708,11 +698,11 @@ class KnowledgeBaseService:
             from core.database import delete_knowledge_base as db_delete_kb
 
             logger.info(f"{'='*60}")
-            logger.info(f"🧪 开始执行删除知识库操作")
+            logger.info(f"������ 开始执行删除知识库操作")
             logger.info(f"{'='*60}")
             logger.info(f"   kb_id: {kb_id}")
 
-            logger.info(f"📝 第 1 步: 从数据库查询知识库信息")
+            logger.info(f"������ 第 1 步: 从数据库查询知识库信息")
 
             # 1. 从数据库获取知识库信息（在 session 内获取所有属性）
             with get_session() as session:
@@ -736,7 +726,7 @@ class KnowledgeBaseService:
                 logger.info(f"      - milvus_collection: {milvus_collection}")
                 logger.info(f"      - total_chunks: {kb.total_chunks}")
 
-            logger.info(f"📝 第 2 步: 删除 Milvus 集合")
+            logger.info(f"������ 第 2 步: 删除 Milvus 集合")
 
             # 2. 删除 Milvus 集合
             milvus_client = MilvusClient(collection_name=milvus_collection)
@@ -750,7 +740,7 @@ class KnowledgeBaseService:
                 milvus_client.close()
                 logger.info(f"   - Milvus 客户端已关闭")
 
-            logger.info(f"📝 第 3 步: 删除文件目录")
+            logger.info(f"������ 第 3 步: 删除文件目录")
 
             # 3. 删除文件目录
             kb_dir = self.document_root / kb_id
@@ -763,7 +753,7 @@ class KnowledgeBaseService:
             else:
                 logger.info(f"   ⚠️  文件目录不存在: {kb_dir}")
 
-            logger.info(f"📝 第 4 步: 删除数据库记录")
+            logger.info(f"������ 第 4 步: 删除数据库记录")
 
             # 4. 删除数据库记录
             logger.info(f"   - 调用数据库删除函数")
@@ -801,3 +791,4 @@ def get_kb_service() -> KnowledgeBaseService:
     if _kb_service is None:
         _kb_service = KnowledgeBaseService()
     return _kb_service
+

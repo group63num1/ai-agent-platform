@@ -31,7 +31,9 @@ public class AiAgentClient {
     public void streamChat(Map<String, Object> payload, Consumer<String> eventConsumer) throws IOException {
         HttpURLConnection connection = null;
         try {
-            URL url = new URL(config.getChatUrl());
+            String chatUrl = config.getChatUrl();
+	    System.out.println("AI Agent Chat URL: " + chatUrl);
+	    URL url = new URL(chatUrl);
             connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("POST");
             connection.setConnectTimeout(config.getConnectTimeoutMs());

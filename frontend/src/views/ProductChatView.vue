@@ -187,9 +187,14 @@ async function sendMessage() {
   try {
     messages.value.push({ role: 'user', content: userMessage.value })
     // SSE POST
+    const token = localStorage.getItem('token') || ''
     const resp = await fetch(`/api/agents/${agentId}/sessions/${activeSessionId.value}/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'text/event-stream',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
       body: JSON.stringify({ message: userMessage.value })
     })
     const reader = resp.body.getReader()
@@ -260,3 +265,4 @@ function goBack() {
   router.push({ name: 'products' })
 }
 </script>
+

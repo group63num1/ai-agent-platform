@@ -22,6 +22,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.util.UriComponentsBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
@@ -30,6 +32,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class PluginServiceImpl implements PluginService {
+
+    private static final Logger logger = LoggerFactory.getLogger(PluginServiceImpl.class);
 
     private static final String STATUS_DRAFT = "draft";
     private static final String STATUS_ENABLED = "enabled";
@@ -258,6 +262,9 @@ public class PluginServiceImpl implements PluginService {
         if (StringUtils.isBlank(specJson)) {
             return;
         }
+        String url = buildAiAgentUrl(AI_AGENT_TOOL_PATH);
+        logger.info("创建插件工具 - 调用 AI Agent: {}", url);
+        
         Map<String, Object> openApiSpec = parseOpenApiSpec(specJson);
         Map<String, Object> payload = new HashMap<>();
         payload.put("user_id", String.valueOf(userId == null ? 0L : userId));
@@ -267,11 +274,33 @@ public class PluginServiceImpl implements PluginService {
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, headers);
 
-        ResponseEntity<String> response = restTemplate.postForEntity(buildAiAgentUrl(AI_AGENT_TOOL_PATH), entity, String.class);
-        if (!response.getStatusCode().is2xxSuccessful()) {
-            throw new RuntimeException("AI Agent工具创建失败，状态码：" + response.getStatusCodeValue());
+        try {
+            logger.debug("创建插件工具请求: user_id={}, openapi_spec_size={}", userId, specJson.length());
+            ResponseEntity<String> response = restTemplate.postForEntity(url, entity, String.class);
+            logger.debug("创建插件工具响应状态: {}, 响应体: {}", response.getStatusCode(), response.getBody());
+            
+            if (!response.getStatusCode().is2xxSuccessful()) {
+                String errorMsg = String.format("AI Agent工具创建失败: 状态码=%d, 响应=%s", 
+                    response.getStatusCodeValue(), response.getBody());
+                logger.error(errorMsg);
+                throw new RuntimeException(errorMsg);
+            }
+            validateAiAgentResponse(response.getBody());
+            logger.info("插件工具创建成功");
+        } catch (org.springframework.web.client.ResourceAccessException e) {
+            String errorMsg = String.format("无法连接到 AI Agent 服务 (%s): %s", url, e.getMessage());
+            logger.error(errorMsg, e);
+            throw new RuntimeException(errorMsg, e);
+        } catch (org.springframework.web.client.HttpClientErrorException | org.springframework.web.client.HttpServerErrorException e) {
+            String errorMsg = String.format("AI Agent工具创建失败: 状态码=%d, 响应=%s", 
+                e.getRawStatusCode(), e.getResponseBodyAsString());
+            logger.error(errorMsg, e);
+            throw new RuntimeException(errorMsg, e);
+        } catch (Exception e) {
+            String errorMsg = String.format("创建插件工具时发生未知错误: %s", e.getMessage());
+            logger.error(errorMsg, e);
+            throw new RuntimeException(errorMsg, e);
         }
-        validateAiAgentResponse(response.getBody());
     }
 
     private Map<String, Object> parseOpenApiSpec(String specJson) {
@@ -605,5 +634,6 @@ public class PluginServiceImpl implements PluginService {
         return pluginMapper.selectPublishedNames();
     }
 }
+
 
 
