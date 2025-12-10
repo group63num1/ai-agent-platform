@@ -1,27 +1,44 @@
-version: "3.9"
+version: '3.8'
 
 services:
   mysql:
     image: mysql:8.0
-    container_name: mysql-new-db
-    restart: always
+    container_name: mysql8-demo2
     environment:
-      MYSQL_ROOT_PASSWORD: 123456
-      MYSQL_DATABASE: new_db
-      TZ: Asia/Shanghai
+      - MYSQL_ROOT_PASSWORD=root123456   # 只保留 root 密码
     ports:
       - "3307:3306"
+    command: [
+      "--default-authentication-plugin=mysql_native_password",
+      "--character-set-server=utf8mb4",
+      "--collation-server=utf8mb4_0900_ai_ci"
+    ]
     volumes:
-      # 在容器首次启动时自动执行 new_db 初始化脚本
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - mysql_data:/var/lib/mysql
+    networks:
+      - demo_network
+    restart: unless-stopped
 
   phpmyadmin:
     image: phpmyadmin/phpmyadmin
-    container_name: pma-new-db
-    restart: always
+    container_name: phpmyadmin-demo2
+    environment:
+      - PMA_HOST=mysql
+      - PMA_PORT=3306
+      - PMA_USER=root
+      - PMA_PASSWORD=root123456        # 登录 phpMyAdmin 使用 root
     ports:
       - "8082:80"
-    environment:
-      PMA_HOST: mysql
-      PMA_PORT: 3306
-      UPLOAD_LIMIT: 200M
+    depends_on:
+      - mysql
+    networks:
+      - demo_network
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  demo_network:
+    driver: bridge
