@@ -17,7 +17,8 @@ services:
     ]
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./init:/docker-entrypoint-initdb.d
+      # 在容器首次启动时自动执行 demo_db 初始化脚本
+      - ./demo_db.sql:/docker-entrypoint-initdb.d/demo_db.sql
     networks:
       - demo_network
     restart: unless-stopped

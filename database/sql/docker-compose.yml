@@ -11,6 +11,9 @@ services:
       TZ: Asia/Shanghai
     ports:
       - "3307:3306"
+    volumes:
+      # 在容器首次启动时自动执行 new_db 初始化脚本
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
 
   phpmyadmin:
     image: phpmyadmin/phpmyadmin
