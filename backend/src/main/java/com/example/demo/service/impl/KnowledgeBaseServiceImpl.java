@@ -19,8 +19,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -30,8 +28,6 @@ import java.util.stream.Collectors;
 
 @Service
 public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
-
-    private static final Logger logger = LoggerFactory.getLogger(KnowledgeBaseServiceImpl.class);
 
     private static final String DEFAULT_CATEGORY = "personal";
     private static final int DEFAULT_PAGE = 1;
@@ -224,10 +220,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
     }
 
     private String createOnAiAgent(Long userId, KnowledgeBaseCreateRequest request) throws IOException {
-        String url = buildUrl(AI_AGENT_KB_PATH);
-	logger.info("创建知识库 - 调用 AI Agent: {}", url);
-
-	Map<String, Object> payload = new HashMap<>();
+        Map<String, Object> payload = new HashMap<>();
         payload.put("user_id", userId == null ? "" : String.valueOf(userId));
         payload.put("name", request.getName());
         payload.put("description", request.getDescription());
@@ -240,42 +233,16 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, headers);
-        
-        try {
-            logger.debug("创建知识库请求: {}", payload);
-            ResponseEntity<String> resp = restTemplate.postForEntity(url, entity, String.class);
-            logger.debug("创建知识库响应状态: {}, 响应体: {}", resp.getStatusCode(), resp.getBody());
-            
-            if (!resp.getStatusCode().is2xxSuccessful()) {
-                String errorMsg = String.format("AI Agent 创建知识库失败: 状态码=%d, 响应=%s", 
-                    resp.getStatusCodeValue(), resp.getBody());
-                logger.error(errorMsg);
-                throw new RuntimeException(errorMsg);
-            }
-            
-            JsonNode root = objectMapper.readTree(resp.getBody());
-            String kbId = root.path("kb_id").asText(null);
-            if (StringUtils.isBlank(kbId)) {
-                String errorMsg = String.format("AI Agent 未返回知识库ID, 响应: %s", resp.getBody());
-                logger.error(errorMsg);
-                throw new RuntimeException(errorMsg);
-            }
-            logger.info("知识库创建成功, kb_id: {}", kbId);
-            return kbId;
-        } catch (org.springframework.web.client.ResourceAccessException e) {
-            String errorMsg = String.format("无法连接到 AI Agent 服务 (%s): %s", url, e.getMessage());
-            logger.error(errorMsg, e);
-            throw new RuntimeException(errorMsg, e);
-        } catch (org.springframework.web.client.HttpClientErrorException | org.springframework.web.client.HttpServerErrorException e) {
-            String errorMsg = String.format("AI Agent 创建知识库失败: 状态码=%d, 响应=%s", 
-                e.getRawStatusCode(), e.getResponseBodyAsString());
-            logger.error(errorMsg, e);
-            throw new RuntimeException(errorMsg, e);
-        } catch (Exception e) {
-            String errorMsg = String.format("创建知识库时发生未知错误: %s", e.getMessage());
-            logger.error(errorMsg, e);
-            throw new RuntimeException(errorMsg, e);
-        }        
+        ResponseEntity<String> resp = restTemplate.postForEntity(buildUrl(AI_AGENT_KB_PATH), entity, String.class);
+        if (!resp.getStatusCode().is2xxSuccessful()) {
+            throw new RuntimeException("AI Agent 创建知识库失败: " + resp.getStatusCodeValue());
+        }
+        JsonNode root = objectMapper.readTree(resp.getBody());
+        String kbId = root.path("kb_id").asText(null);
+        if (StringUtils.isBlank(kbId)) {
+            throw new RuntimeException("AI Agent 未返回知识库ID");
+        }
+        return kbId;
     }
 
     private void deleteOnAiAgent(String kbId) {

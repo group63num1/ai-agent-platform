@@ -29,10 +29,7 @@ public class AgentServiceImpl implements AgentService {
 
     private static final String STATUS_DRAFT = "draft";
     private static final String STATUS_PUBLISHED = "published";
-    // 使用数据库中存在的模型作为默认值
-    private static final String DEFAULT_MODEL = "qwen-max";
-    // 数据库中可用的模型列表
-    private static final Set<String> VALID_MODELS = Set.of("qwen-max", "qwen-mt-plus", "qwen3-max");
+    private static final String DEFAULT_MODEL = "gpt-4o-mini";
     private static final int DEFAULT_CONTEXT_ROUNDS = 3;
     private static final int DEFAULT_MAX_TOKENS = 512;
     private static final String DEFAULT_SYSTEM_PROMPT =
@@ -63,13 +60,7 @@ public class AgentServiceImpl implements AgentService {
         agent.setId(generateAgentId());
         agent.setName(request.getName().trim());
         agent.setDescription(trimToNull(request.getDescription()));
-        String model = isBlank(request.getModel()) ? DEFAULT_MODEL : request.getModel().trim();
-        // 验证模型是否存在，如果不存在则使用默认模型
-        if (!VALID_MODELS.contains(model)) {
-            System.out.println("警告: 模型 '" + model + "' 不存在，使用默认模型 '" + DEFAULT_MODEL + "'");
-            model = DEFAULT_MODEL;
-        }
-        agent.setModel(model);
+        agent.setModel(isBlank(request.getModel()) ? DEFAULT_MODEL : request.getModel().trim());
         agent.setPrompt(trimToNull(request.getPrompt()));
         agent.setProfileMd(trimToNull(request.getProfileMd()));
         agent.setContextRounds(resolveContextRounds(request.getContextRounds()));
@@ -132,13 +123,7 @@ public class AgentServiceImpl implements AgentService {
             agent.setDescription(trimToNull(request.getDescription()));
         }
         if (!isBlank(request.getModel())) {
-            String model = request.getModel().trim();
-            // 验证模型是否存在，如果不存在则使用默认模型
-            if (!VALID_MODELS.contains(model)) {
-                System.out.println("警告: 模型 '" + model + "' 不存在，使用默认模型 '" + DEFAULT_MODEL + "'");
-                model = DEFAULT_MODEL;
-            }
-            agent.setModel(model);
+            agent.setModel(request.getModel().trim());
         }
         if (request.getPrompt() != null) {
             agent.setPrompt(trimToNull(request.getPrompt()));
@@ -327,17 +312,8 @@ public class AgentServiceImpl implements AgentService {
     }
 
     private String resolveModelName(Agent agent) {
-        String model = agent.getModel();
-        if (!isBlank(model)) {
-            // 验证模型是否存在于数据库中，如果不存在则使用默认模型
-            String normalizedModel = model.trim();
-            if (VALID_MODELS.contains(normalizedModel)) {
-                return normalizedModel;
-            } else {
-                // 如果模型不存在，使用默认模型并记录警告
-                System.out.println("警告: 模型 '" + normalizedModel + "' 不存在，使用默认模型 '" + DEFAULT_MODEL + "'");
-                return DEFAULT_MODEL;
-            }
+        if (!isBlank(agent.getModel())) {
+            return agent.getModel();
         }
         return DEFAULT_MODEL;
     }
@@ -361,19 +337,10 @@ public class AgentServiceImpl implements AgentService {
                                SseEmitter emitter) {
         StringBuilder assistantBuilder = new StringBuilder();
         try {
-            System.out.println("开始转发请求到 AI Agent");
-            System.out.println("Payload: " + proxyPayload);
             aiAgentClient.streamChat(proxyPayload, data -> handleStreamChunk(data, emitter, assistantBuilder));
-            System.out.println("AI Agent 响应完成，内容长度: " + assistantBuilder.length());
             saveAssistantMessage(sessionId, assistantBuilder.toString());
             emitter.complete();
         } catch (Exception ex) {
-            System.err.println("转发请求到 AI Agent 失败: " + ex.getMessage());
-            System.err.println("异常类型: " + ex.getClass().getName());
-            if (ex instanceof java.net.UnknownHostException) {
-                System.err.println("网络错误: 无法解析主机名，请检查 Docker 网络配置和 AI_AGENT_BASE_URL 环境变量");
-            }
-            ex.printStackTrace();
             handleStreamError(emitter, ex);
         }
     }
@@ -382,23 +349,8 @@ public class AgentServiceImpl implements AgentService {
                                    SseEmitter emitter,
                                    StringBuilder assistantBuilder) {
         try {
-            // 检查是否是错误响应
-            if (data != null && data.trim().startsWith("{")) {
-                try {
-                    JsonNode node = objectMapper.readTree(data);
-                    if (node.has("error") || (node.has("success") && !node.get("success").asBoolean())) {
-                        System.err.println("收到 AI Agent 错误响应: " + data);
-                        // 错误响应也要发送给前端
-                        emitter.send(data, MediaType.TEXT_PLAIN);
-                        return;
-                    }
-                } catch (Exception e) {
-                    // 不是 JSON 格式，继续正常处理
-                }
-            }
             emitter.send(data, MediaType.TEXT_PLAIN);
         } catch (IOException e) {
-            System.err.println("SSE发送失败: " + e.getMessage());
             throw new RuntimeException("SSE发送失败", e);
         }
         if (!isDoneEvent(data)) {
@@ -418,17 +370,10 @@ public class AgentServiceImpl implements AgentService {
             JsonNode node = objectMapper.readTree(data);
             JsonNode contentNode = node.get("content");
             if (contentNode != null && !contentNode.isNull()) {
-                String content = contentNode.asText();
-                if (!isBlank(content)) {
-                    buffer.append(content);
-                }
+                buffer.append(contentNode.asText());
             }
-        } catch (Exception e) {
-            // 如果不是标准 JSON 片段，尝试直接使用原始数据
-            System.out.println("解析 JSON 失败，使用原始数据: " + data.substring(0, Math.min(100, data.length())));
-            if (!data.trim().equals("[DONE]") && !data.trim().startsWith("{")) {
-                buffer.append(data);
-            }
+        } catch (Exception ignore) {
+            // 如果不是标准 JSON 片段，忽略即可
         }
     }
 
@@ -446,42 +391,16 @@ public class AgentServiceImpl implements AgentService {
 
     private void handleStreamError(SseEmitter emitter, Exception ex) {
         try {
-            System.err.println("处理流式错误: " + ex.getMessage());
-            ex.printStackTrace();
-            
-            // 构建错误信息
-            String errorMessage = ex.getMessage();
-            if (ex instanceof java.net.UnknownHostException) {
-                errorMessage = "无法连接到 AI Agent 服务，请检查服务是否正常运行";
-                System.err.println("网络连接错误: 无法解析主机名 'ai-agent'，请检查 Docker 网络配置");
-            }
-            
             Map<String, Object> errorPayload = new HashMap<>();
             errorPayload.put("success", false);
-            errorPayload.put("error", errorMessage);
-            errorPayload.put("content", ""); // 确保前端能识别这是错误
-            
-            try {
-                String errorJson = objectMapper.writeValueAsString(errorPayload);
-                emitter.send("data: " + errorJson + "\n\n", MediaType.TEXT_PLAIN);
-            } catch (Exception sendEx) {
-                System.err.println("发送错误信息失败: " + sendEx.getMessage());
-                // 如果发送失败，尝试发送简单的错误信息
-                try {
-                    emitter.send("data: {\"success\":false,\"error\":\"" + errorMessage.replace("\"", "\\\"") + "\"}\n\n", MediaType.TEXT_PLAIN);
-                } catch (Exception ignore) {
-                    // 忽略
-                }
-            }
-        } catch (Exception e) {
-            System.err.println("处理流式错误时发生异常: " + e.getMessage());
-            e.printStackTrace();
+            errorPayload.put("error", ex.getMessage());
+            emitter.send(SseEmitter.event()
+                    .name("error")
+                    .data(errorPayload));
+        } catch (IOException ignored) {
+            // ignore
         } finally {
-            try {
-                emitter.complete();
-            } catch (Exception ignore) {
-                // 忽略完成时的异常
-            }
+            emitter.completeWithError(ex);
         }
     }
 
@@ -661,6 +580,5 @@ public class AgentServiceImpl implements AgentService {
         return null;
     }
 }
-
 
 

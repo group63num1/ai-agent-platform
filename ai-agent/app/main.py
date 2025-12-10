@@ -299,9 +299,10 @@ async def create_knowledge_base_api(req: KnowledgeBaseCreateRequest):
     - 返回知识库信息
     """
     try:
+        from core.knowledge_service import get_kb_service
 
         kb_service = get_kb_service()
-        from core.knowledge_service import get_kb_service
+
         result = kb_service.create_knowledge_base(
             user_id=req.user_id,
             name=req.name,
@@ -473,8 +474,10 @@ async def delete_knowledge_base(kb_id: str):
     - 返回 success 状态
     """
     try:
-        kb_service = get_kb_service()
         from core.knowledge_service import get_kb_service
+
+        kb_service = get_kb_service()
+
         # 删除知识库（包括 Milvus 集合和数据库记录）
         result = kb_service.delete_knowledge_base(kb_id)
 

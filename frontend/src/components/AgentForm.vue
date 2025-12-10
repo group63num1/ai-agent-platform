@@ -18,7 +18,7 @@
 <script setup>
 import { reactive, watch, computed } from 'vue'
 import { useAgentsStore } from '@/stores/agents'
-const FIXED_MODEL = 'qwen-max' // 使用数据库中存在的模型
+const FIXED_MODEL = 'deepseek-ai/DeepSeek-R1-Distill-Qwen-7B'
 import { getAgents, getPublishedAgents, createAgentSession, getAgentSessions, deleteAgentSession } from '@/api/agent'
 import { ElMessage } from 'element-plus'
 

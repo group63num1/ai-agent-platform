@@ -42,7 +42,7 @@ export const useAgentsStore = defineStore('agents', () => {
     saving.value = true
     try {
       // 强制在创建时使用固定模型标识
-      const created = await createAgent({ model: 'qwen-max', ...payload }) // 使用数据库中存在的模型
+      const created = await createAgent({ model: 'deepseek-ai/DeepSeek-R1-Distill-Qwen-7B', ...payload })
       // 追加到列表（可选：刷新列表替代）
       list.value.unshift(created)
       return created
