@@ -19,6 +19,7 @@ import java.util.function.Consumer;
 public class AiAgentClient {
 
     private static final String DONE_TOKEN = "[DONE]";
+    private static final String CONTENT_FIELD = "content";
 
     private final AiAgentConfig config;
     private final ObjectMapper objectMapper;
@@ -75,6 +76,20 @@ public class AiAgentClient {
         }
     }
 
+    /**
+     * 同步调用 AI Agent /api/chat（底层仍走SSE流），并拼接返回的assistant内容。
+     */
+    public String chatOnce(Map<String, Object> payload) throws IOException {
+        StringBuilder assistant = new StringBuilder();
+        streamChat(payload, event -> {
+            if (DONE_TOKEN.equals(event)) {
+                return;
+            }
+            appendAssistantContent(event, assistant);
+        });
+        return assistant.toString();
+    }
+
     private void dispatchEvent(StringBuilder eventBuilder, Consumer<String> eventConsumer) throws IOException {
         if (eventBuilder.length() == 0) {
             return;
@@ -101,7 +116,24 @@ public class AiAgentClient {
             return builder.toString();
         }
     }
+
+    private void appendAssistantContent(String event, StringBuilder buffer) {
+        if (buffer == null || event == null || event.trim().isEmpty() || DONE_TOKEN.equals(event)) {
+            return;
+        }
+        try {
+            var node = objectMapper.readTree(event);
+            var contentNode = node.get(CONTENT_FIELD);
+            if (contentNode != null && !contentNode.isNull()) {
+                buffer.append(contentNode.asText());
+            }
+        } catch (Exception ignore) {
+            // 非JSON片段时忽略
+        }
+    }
 }
+
+
 
 
 

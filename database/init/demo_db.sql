@@ -178,6 +178,7 @@ CREATE TABLE `plugin_tools` (
 
 CREATE TABLE `agents` (
   `id` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '智能体ID',
+  `user_id` bigint DEFAULT NULL COMMENT '创建者ID',
   `name` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '智能体名称',
   `description` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '简介',
   `model` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'gpt-4o-mini' COMMENT '默认模型',
@@ -191,6 +192,33 @@ CREATE TABLE `agents` (
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='智能体配置表';
+
+-- --------------------------------------------------------
+--
+-- 表的结构 `workflows`
+--
+CREATE TABLE `workflows` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '工作流ID',
+  `user_id` bigint NOT NULL COMMENT '创建者ID',
+  `name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '工作流名称',
+  `intro` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '工作流简介',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='工作流表';
+
+-- --------------------------------------------------------
+--
+-- 表的结构 `workflow_nodes`
+--
+CREATE TABLE `workflow_nodes` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '工作流节点ID',
+  `workflow_id` bigint NOT NULL COMMENT '工作流ID',
+  `seq` int NOT NULL COMMENT '节点顺序（从0开始）',
+  `agent_id` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '已发布智能体ID',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='工作流节点表';
 
 --
 -- 表的结构 `agent_messages`
@@ -1009,7 +1037,23 @@ ALTER TABLE `agents`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `ux_agents_name` (`name`),
   ADD KEY `idx_agents_status` (`status`),
+  ADD KEY `idx_agents_user_id` (`user_id`),
   ADD KEY `idx_agents_updated_at` (`updated_at`);
+
+--
+-- 表的索引 `workflows`
+--
+ALTER TABLE `workflows`
+  ADD KEY `idx_workflows_user_id` (`user_id`),
+  ADD KEY `idx_workflows_updated_at` (`updated_at`);
+
+--
+-- 表的索引 `workflow_nodes`
+--
+ALTER TABLE `workflow_nodes`
+  ADD UNIQUE KEY `uk_workflow_nodes_workflow_seq` (`workflow_id`,`seq`),
+  ADD KEY `idx_workflow_nodes_workflow_id` (`workflow_id`),
+  ADD KEY `idx_workflow_nodes_agent_id` (`agent_id`);
 
 --
 -- 表的索引 `agent_messages`
@@ -1274,6 +1318,18 @@ ALTER TABLE `chat_session`
   MODIFY `id` bigint NOT NULL AUTO_INCREMENT COMMENT '会话ID', AUTO_INCREMENT=4;
 
 --
+-- 使用表AUTO_INCREMENT `workflows`
+--
+ALTER TABLE `workflows`
+  MODIFY `id` bigint NOT NULL AUTO_INCREMENT COMMENT '工作流ID';
+
+--
+-- 使用表AUTO_INCREMENT `workflow_nodes`
+--
+ALTER TABLE `workflow_nodes`
+  MODIFY `id` bigint NOT NULL AUTO_INCREMENT COMMENT '工作流节点ID';
+
+--
 -- 使用表AUTO_INCREMENT `agent_messages`
 --
 ALTER TABLE `agent_messages`
@@ -1426,6 +1482,19 @@ ALTER TABLE `agent_sessions`
 --
 ALTER TABLE `agent_messages`
   ADD CONSTRAINT `fk_agent_messages_session` FOREIGN KEY (`session_id`) REFERENCES `agent_sessions` (`session_id`) ON DELETE CASCADE;
+
+--
+-- 限制表 `workflows`
+--
+ALTER TABLE `workflows`
+  ADD CONSTRAINT `fk_workflows_user_id` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+--
+-- 限制表 `workflow_nodes`
+--
+ALTER TABLE `workflow_nodes`
+  ADD CONSTRAINT `fk_workflow_nodes_workflow_id` FOREIGN KEY (`workflow_id`) REFERENCES `workflows` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_workflow_nodes_agent_id` FOREIGN KEY (`agent_id`) REFERENCES `agents` (`id`) ON DELETE RESTRICT;
 
 --
 -- 限制表 `knowledge_chunk_embedding`

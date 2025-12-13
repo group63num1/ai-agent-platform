@@ -6,6 +6,7 @@
 
     <resultMap id="AgentResultMap" type="com.example.demo.app.entity.Agent">
         <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
         <result column="name" property="name"/>
         <result column="description" property="description"/>
         <result column="model" property="model"/>
@@ -21,16 +22,16 @@
     </resultMap>
 
     <sql id="AgentColumns">
-        id, name, description, model, prompt, profile_md, context_rounds,
+        id, user_id, name, description, model, prompt, profile_md, context_rounds,
         max_tokens, plugins, knowledge_base, status, created_at, updated_at
     </sql>
 
     <insert id="insert" parameterType="com.example.demo.app.entity.Agent">
         INSERT INTO agents (
-            id, name, description, model, prompt, profile_md, context_rounds,
+            id, user_id, name, description, model, prompt, profile_md, context_rounds,
             max_tokens, plugins, knowledge_base, status, created_at, updated_at
         ) VALUES (
-            #{id}, #{name}, #{description}, #{model}, #{prompt}, #{profileMd},
+            #{id}, #{userId}, #{name}, #{description}, #{model}, #{prompt}, #{profileMd},
             #{contextRounds}, #{maxTokens}, #{plugins}, #{knowledgeBase}, #{status},
             #{createdAt}, #{updatedAt}
         )
