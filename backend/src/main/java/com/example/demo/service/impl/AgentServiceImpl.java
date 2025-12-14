@@ -52,12 +52,13 @@ public class AgentServiceImpl implements AgentService {
 
     @Override
     @Transactional
-    public AgentDTO createAgent(AgentCreateRequest request) {
+    public AgentDTO createAgent(Long userId, AgentCreateRequest request) {
         validateAgentName(request.getName());
         ensureNameUnique(request.getName(), null);
 
         Agent agent = new Agent();
         agent.setId(generateAgentId());
+        agent.setUserId(userId);
         agent.setName(request.getName().trim());
         agent.setDescription(trimToNull(request.getDescription()));
         agent.setModel(isBlank(request.getModel()) ? DEFAULT_MODEL : request.getModel().trim());

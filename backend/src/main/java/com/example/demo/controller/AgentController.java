@@ -7,6 +7,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import com.example.demo.util.JwtUtil;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.List;
 
@@ -17,10 +22,17 @@ public class AgentController {
     @Autowired
     private AgentService agentService;
 
+    @Autowired
+    private JwtUtil jwtUtil;
+
     @PostMapping
-    public ApiResponse<AgentDTO> createAgent(@RequestBody AgentCreateRequest request) {
+    public ApiResponse<AgentDTO> createAgent(@RequestBody AgentCreateRequest request,
+                                             HttpServletRequest httpRequest) {
         try {
-            return ApiResponse.ok(agentService.createAgent(request));
+            Long userId = requireUserId(httpRequest);
+            return ApiResponse.ok(agentService.createAgent(userId, request));
+        } catch (IllegalStateException e) {
+            return ApiResponse.fail(401, e.getMessage());
         } catch (Exception e) {
             return ApiResponse.fail(400, e.getMessage());
         }
@@ -150,6 +162,24 @@ public class AgentController {
         } catch (Exception e) {
             return ApiResponse.fail(400, e.getMessage());
         }
+    }
+
+    private Long requireUserId(HttpServletRequest request) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof Long) {
+            return (Long) authentication.getPrincipal();
+        }
+        String bearer = request == null ? null : request.getHeader("Authorization");
+        if (bearer != null && bearer.startsWith("Bearer ")) {
+            String token = bearer.substring(7);
+            if (jwtUtil.validateToken(token)) {
+                Long userId = jwtUtil.getUserIdFromToken(token);
+                if (userId != null) {
+                    return userId;
+                }
+            }
+        }
+        throw new IllegalStateException("未登录或token无效");
     }
 }
 

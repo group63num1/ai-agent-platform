@@ -13,7 +13,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.util.List;
 
 public interface AgentService {
-    AgentDTO createAgent(AgentCreateRequest request);
+    AgentDTO createAgent(Long userId, AgentCreateRequest request);
 
     AgentListResponse listAgents(int page, int pageSize, String keyword);
 

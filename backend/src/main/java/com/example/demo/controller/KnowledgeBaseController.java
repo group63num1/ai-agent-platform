@@ -3,10 +3,14 @@ package com.example.demo.controller;
 import com.example.demo.common.ApiResponse;
 import com.example.demo.dto.*;
 import com.example.demo.service.KnowledgeBaseService;
+import com.example.demo.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.util.List;
 
@@ -17,12 +21,18 @@ public class KnowledgeBaseController {
     @Autowired
     private KnowledgeBaseService knowledgeBaseService;
 
+    @Autowired
+    private JwtUtil jwtUtil;
+
     @PostMapping
     public ApiResponse<KnowledgeBaseDTO> create(@RequestBody KnowledgeBaseCreateRequest request,
-                                                @RequestHeader(value = "X-User-Id", required = false) Long userId) {
+                                                HttpServletRequest httpRequest) {
         try {
+            Long userId = requireUserId(httpRequest);
             KnowledgeBaseDTO dto = knowledgeBaseService.create(userId, request);
             return ApiResponse.ok(dto);
+        } catch (IllegalStateException e) {
+            return ApiResponse.fail(401, e.getMessage());
         } catch (Exception e) {
             return ApiResponse.fail(400, e.getMessage());
         }
@@ -119,6 +129,24 @@ public class KnowledgeBaseController {
         } catch (Exception e) {
             return ApiResponse.fail(400, e.getMessage());
         }
+    }
+
+    private Long requireUserId(HttpServletRequest request) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof Long) {
+            return (Long) authentication.getPrincipal();
+        }
+        String bearer = request == null ? null : request.getHeader("Authorization");
+        if (bearer != null && bearer.startsWith("Bearer ")) {
+            String token = bearer.substring(7);
+            if (jwtUtil.validateToken(token)) {
+                Long userId = jwtUtil.getUserIdFromToken(token);
+                if (userId != null) {
+                    return userId;
+                }
+            }
+        }
+        throw new IllegalStateException("未登录或token无效");
     }
 }
 
