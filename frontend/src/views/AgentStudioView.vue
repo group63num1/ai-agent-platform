@@ -28,19 +28,8 @@
         <div class="space-y-4">
           <el-form label-width="120px">
             <el-form-item label="选择模型">
-              <el-select v-model="settings.model" placeholder="选择模型">
-                <!-- OpenAI 系列 -->
-                <el-option label="OpenAI · gpt-4o" value="gpt-4o" />
-                <el-option label="OpenAI · gpt-4o-mini" value="gpt-4o-mini" />
-                <!-- 腾讯混元 -->
-                <el-option label="腾讯混元 · hunyuan-lite" value="hunyuan-lite" />
-                <el-option label="腾讯混元 · hunyuan-pro" value="hunyuan-pro" />
-                <!-- 字节豆包 -->
-                <el-option label="豆包 · doubao-lite" value="doubao-lite" />
-                <el-option label="豆包 · doubao-pro" value="doubao-pro" />
-                <!-- DeepSeek -->
-                <el-option label="DeepSeek · deepseek-chat" value="deepseek-chat" />
-                <el-option label="DeepSeek · deepseek-r1" value="deepseek-r1" />
+              <el-select v-model="settings.model" placeholder="选择模型" :loading="loadingModels">
+                <el-option v-for="name in modelNames" :key="name" :label="name" :value="name" />
               </el-select>
             </el-form-item>
             <el-form-item label="上下文轮数">
@@ -154,8 +143,7 @@ import { onMounted, ref, reactive, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAgentsStore } from '@/stores/agents'
-import { updateAgent, getAgent, getAgentSessions, createAgentSession } from '@/api/agent'
-import { chatWithAgent, getAgentChatMessages } from '@/api/agent'
+import { updateAgent, getAgent, getAgentSessions, createAgentSession, getAgentSessionMessages, chatAgentSessionSSE, getModels } from '@/api/agent'
 import { ArrowLeft } from '@element-plus/icons-vue'
 import { getPlugins } from '@/api/plugins'
 import { getKnowledgeBasesList } from '@/api/agent'
@@ -181,6 +169,7 @@ const publishing = computed(() => store.publishing)
 const userMessage = ref('')
 const chatting = ref(false)
 const messages = ref([])
+const currentSessionId = ref('')
 const localHistoryKey = `agent_chat_history_${agentId}`
 const FIXED_MODEL = 'deepseek-ai/DeepSeek-R1-Distill-Qwen-7B'
 const pluginOptions = ref([])
@@ -190,6 +179,8 @@ const kbOptions = ref([])
 const addKBDialogVisible = ref(false)
 const pluginsExpanded = ref(true)
 const kbsExpanded = ref(true)
+const modelNames = ref([])
+const loadingModels = ref(false)
 
 async function fetchPlugins() {
   loadingPlugins.value = true
@@ -211,31 +202,40 @@ onMounted(async () => {
   settings.contextRounds = a.contextRounds ?? settings.contextRounds
   settings.maxTokens = a.maxTokens ?? settings.maxTokens
   settings.plugins = a.plugins || []
-  settings.knowledgeBases = a.knowledgeBases || a.knowledge_base || []
+  settings.knowledgeBases = a.knowledgeBases || a.knowledge_base || a.knowledgeBase || []
 
-  // 直接加载后端基于智能体的历史消息
-  await loadHistory()
   // 草稿进入工作台时，如无会话则自动创建调试会话
   try {
     const sessions = await getAgentSessions(agentId)
     const list = Array.isArray(sessions) ? sessions : (sessions?.items || [])
     if (!list || list.length === 0) {
       await createAgentSession(agentId, { name: '调试会话' })
+      const sessions2 = await getAgentSessions(agentId)
+      const list2 = Array.isArray(sessions2) ? sessions2 : (sessions2?.items || [])
+      if (list2.length > 0) currentSessionId.value = list2[0].sessionId
+    } else {
+      currentSessionId.value = list[0].sessionId
     }
   } catch (e) {
     console.warn('进入工作台自动创建调试会话失败：', e)
   }
+  // 加载当前会话历史
+  await loadHistory()
+
+  // 加载模型显示名列表
+  await fetchModelNames()
 })
 
 async function loadHistory() {
+  if (!currentSessionId.value) return
   try {
-    const list = await getAgentChatMessages(agentId, { limit: 200 })
+    const list = await getAgentSessionMessages(agentId, currentSessionId.value, { limit: 200 })
     if (Array.isArray(list)) {
       messages.value = list.map(m => ({ role: m.role || 'assistant', content: m.content || '' }))
       return
     }
   } catch (e) {
-    console.warn('后端历史加载失败，使用本地缓存回退：', e)
+    console.warn('会话历史加载失败，使用本地缓存回退：', e)
   }
   loadLocalHistory()
 }
@@ -287,18 +287,14 @@ async function sendMessage() {
   try {
     const content = userMessage.value
     messages.value.push({ role: 'user', content })
-    // 强制使用后端指定的固定模型标识
-    const payload = {
-      message: content,
-      model: FIXED_MODEL,
-      contextRounds: settings.contextRounds,
-      maxTokens: settings.maxTokens
+    let assistantBuffer = ''
+    await chatAgentSessionSSE(agentId, currentSessionId.value, content, (delta) => {
+      assistantBuffer += delta
+    })
+    if (assistantBuffer) {
+      messages.value.push({ role: 'assistant', content: assistantBuffer })
     }
-    const resp = await chatWithAgent(agentId, payload)
-    const reply = resp?.content || resp?.message || (typeof resp === 'string' ? resp : JSON.stringify(resp))
-    messages.value.push({ role: 'assistant', content: reply || '' })
     userMessage.value = ''
-    // 本地持久化（作为后备，避免刷新丢失）
     try { localStorage.setItem(localHistoryKey, JSON.stringify(messages.value)) } catch {}
   } catch (e) {
     ElMessage.error(e.message || '发送失败')
@@ -347,4 +343,20 @@ function addKB(val) {
   if (!settings.knowledgeBases.includes(val)) settings.knowledgeBases.push(val)
 }
 function removeKB(idx) { settings.knowledgeBases.splice(idx, 1) }
+
+async function fetchModelNames() {
+  loadingModels.value = true
+  try {
+    const res = await getModels()
+    const names = Array.isArray(res?.models) ? res.models : (Array.isArray(res) ? res : [])
+    modelNames.value = names
+    if (settings.model && !modelNames.value.includes(settings.model)) {
+      settings.model = ''
+    }
+  } catch (e) {
+    console.warn('加载模型列表失败：', e)
+  } finally {
+    loadingModels.value = false
+  }
+}
 </script>

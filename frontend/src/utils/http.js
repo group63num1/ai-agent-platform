@@ -109,3 +109,18 @@ http.interceptors.response.use(
 
 export { http, USE_MOCK }
 
+// 为非 axios 请求（如原生 fetch / SSE）提供统一的认证与基础地址
+export function getAuthHeaders() {
+  const token = localStorage.getItem('token')
+  const headers = {
+    'Accept': 'application/json',
+    'Content-Type': 'application/json'
+  }
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  return headers
+}
+
+export function getBaseApi() {
+  return BASE_API
+}
+
