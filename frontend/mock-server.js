@@ -39,8 +39,9 @@ let MENUS = [
   { title: '首页', path: '/home', icon: 'House', permission: 'home:view', sortOrder: 1 },
   { title: '应用管理', path: '/home/apps', icon: 'Grid', permission: 'apps:view', sortOrder: 2 },
   { title: '智能体管理', path: '/home/agents', icon: 'Grid', permission: 'agents:view', sortOrder: 3 },
-  { title: '插件管理', path: '/home/plugins', icon: 'Grid', permission: 'plugins:view', sortOrder: 5},
   { title: '知识库管理', path: '/home/knowledge-bases', icon: 'Grid', permission: 'kb:view', sortOrder: 4 },
+  { title: '工作流编排', path: '/home/workflows', icon: 'Grid', permission: 'workflow:view', sortOrder: 5 },
+  { title: '插件管理', path: '/home/plugins', icon: 'Grid', permission: 'plugins:view', sortOrder: 6},
   { title: '个人信息', path: '/home/profile', icon: 'User', permission: 'profile:view', sortOrder: 9 }
 ]
 
@@ -61,6 +62,22 @@ let KNOWLEDGE_BASES = [
 ]
 
 let DOCUMENTS = {}
+
+// 工作流数据
+let WORKFLOWS = [
+  {
+    id: nanoid(8),
+    name: '客服分流',
+    intro: '根据工单内容自动分配到合适的客服队列，并通知值班同学。',
+    status: 'draft',
+    triggerType: 'manual',
+    tags: ['客服', '分配'],
+    agentIds: [],
+    createdAt: Date.now() - 7200000,
+    updatedAt: Date.now() - 3600000
+  }
+]
+let WORKFLOW_RUNS = {}
 
 // 伪鉴权：约定一个固定 token
 const VALID_TOKEN = 'mock-token'
@@ -371,6 +388,95 @@ app.post('/api/knowledge-bases/:id/search', (req, res) => {
     query,
     topK,
     similarityThreshold
+  }))
+})
+
+// ==================== 工作流编排 API ====================
+app.get('/api/workflows', (req, res) => {
+  let { page = 1, pageSize = 20, keyword = '', status } = req.query
+  page = parseInt(page)
+  pageSize = parseInt(pageSize)
+  let items = WORKFLOWS.filter(flow => {
+    const kw = keyword.trim()
+    const matchKeyword = kw ? (flow.name || '').includes(kw) || (flow.tags || []).some(t => t.includes(kw)) : true
+    const matchStatus = status ? flow.status === status : true
+    return matchKeyword && matchStatus
+  })
+  const total = items.length
+  const start = (page - 1) * pageSize
+  const end = start + pageSize
+  items = items.slice(start, end)
+  res.json(ok({ items, total, page, pageSize }))
+})
+
+app.post('/api/workflows', (req, res) => {
+  const { name, intro = '', status = 'draft', triggerType = 'manual', tags = [] } = req.body || {}
+  if (!name) return res.status(400).json(fail(400, '名称必填'))
+  const now = Date.now()
+  const flow = {
+    id: nanoid(8),
+    name,
+    intro,
+    status,
+    triggerType,
+    tags,
+    agentIds: [],
+    createdAt: now,
+    updatedAt: now
+  }
+  WORKFLOWS.unshift(flow)
+  res.json(ok(flow))
+})
+
+app.get('/api/workflows/:id', (req, res) => {
+  const flow = WORKFLOWS.find(w => w.id === req.params.id)
+  if (!flow) return res.status(404).json(fail(404, '未找到工作流'))
+  res.json(ok(flow))
+})
+
+app.post('/api/workflows/:id/save', (req, res) => {
+  const idx = WORKFLOWS.findIndex(w => w.id === req.params.id)
+  if (idx === -1) return res.status(404).json(fail(404, '未找到工作流'))
+  const { agentIds = [] } = req.body || {}
+  if (!Array.isArray(agentIds)) return res.status(400).json(fail(400, 'agentIds 应为数组'))
+
+  const invalid = agentIds.find(id => !AGENTS.find(a => a.id === id && a.status === 'published'))
+  if (invalid) return res.status(400).json(fail(400, `Agent ${invalid} 不存在或未发布`))
+
+  WORKFLOWS[idx] = {
+    ...WORKFLOWS[idx],
+    agentIds: [...agentIds],
+    updatedAt: Date.now()
+  }
+  res.json(ok(WORKFLOWS[idx]))
+})
+
+app.delete('/api/workflows/:id', (req, res) => {
+  const idx = WORKFLOWS.findIndex(w => w.id === req.params.id)
+  if (idx === -1) return res.status(404).json(fail(404, '未找到工作流'))
+  const removed = WORKFLOWS[idx]
+  WORKFLOWS.splice(idx, 1)
+  delete WORKFLOW_RUNS[removed.id]
+  res.json(ok({ id: removed.id }))
+})
+
+app.post('/api/workflows/:id/execute', (req, res) => {
+  const flow = WORKFLOWS.find(w => w.id === req.params.id)
+  if (!flow) return res.status(404).json(fail(404, '未找到工作流'))
+  const { input = '', nodeInputs = [], sessionId = nanoid(10) } = req.body || {}
+
+  const results = (flow.agentIds || []).map(agentId => ({
+    agentId,
+    output: `模拟执行 Agent(${agentId})，输入：${input || '空'}`
+  }))
+
+  const output = results.length ? results[results.length - 1].output : ''
+  res.json(ok({
+    workflowId: flow.id,
+    sessionId,
+    nodeResults: results,
+    output,
+    nodeInputs
   }))
 })
 
