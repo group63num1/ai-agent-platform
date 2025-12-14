@@ -7,7 +7,7 @@
       </div>
       <div class="flex items-center gap-2">
         <el-button @click="refresh">刷新</el-button>
-        <el-button type="primary" @click="openCreate">+ 新建工作流（拖拽）</el-button>
+        <el-button type="primary" @click="showCreate = true">+ 新建工作流（拖拽）</el-button>
       </div>
     </div>
 
@@ -79,12 +79,43 @@
           <div class="text-xs text-gray-400">更新于 {{ formatTime(flow.updatedAt || flow.createdAt) }}</div>
           <div class="flex gap-2">
             <el-button size="small" text type="primary" @click="handleEdit(flow)">进入编排</el-button>
-            <el-button size="small" text type="success" :loading="store.running" @click="handleRun(flow)">运行</el-button>
             <el-button size="small" text type="danger" @click="handleDelete(flow)">删除</el-button>
           </div>
         </div>
       </div>
     </div>
+
+    <el-dialog v-model="showCreate" title="创建工作流" width="520px" :close-on-click-modal="false" @closed="resetCreateForm">
+      <div class="flex flex-col items-center gap-6 pb-2">
+        <div class="w-16 h-16 rounded-2xl bg-emerald-50 flex items-center justify-center">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" class="w-8 h-8 text-emerald-500">
+            <path d="M9 6h6m-3-3v6m-6 9h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+            <rect x="4" y="4" width="16" height="16" rx="4" stroke="currentColor" stroke-width="1.8" />
+          </svg>
+        </div>
+        <el-form ref="createFormRef" :model="createForm" label-position="top" class="w-full">
+          <el-form-item label="工作流名称" required>
+            <el-input v-model="createForm.name" maxlength="30" show-word-limit placeholder="请输入工作流名称" />
+          </el-form-item>
+          <el-form-item label="工作流描述" required>
+            <el-input
+              v-model="createForm.intro"
+              type="textarea"
+              :rows="4"
+              maxlength="600"
+              show-word-limit
+              placeholder="请输入描述，让大模型理解什么情况下应该调用此工作流"
+            />
+          </el-form-item>
+        </el-form>
+      </div>
+      <template #footer>
+        <span class="dialog-footer flex gap-2 justify-end">
+          <el-button @click="showCreate = false">取消</el-button>
+          <el-button type="primary" :loading="store.saving" @click="handleCreateConfirm">确认</el-button>
+        </span>
+      </template>
+    </el-dialog>
 
   </div>
 </template>
@@ -130,8 +161,27 @@ function formatTime(ts) {
   return date.toLocaleString()
 }
 
-function openCreate() {
-  router.push({ name: 'workflowBuilderNew' })
+const showCreate = ref(false)
+const createForm = ref({ name: '', intro: '' })
+const createFormRef = ref(null)
+
+function resetCreateForm() {
+  createForm.value = { name: '', intro: '' }
+}
+
+async function handleCreateConfirm() {
+  if (!createForm.value.name) {
+    return ElMessage.warning('请输入工作流名称')
+  }
+  try {
+    const created = await store.create({ name: createForm.value.name, intro: createForm.value.intro })
+    ElMessage.success('创建成功')
+    showCreate.value = false
+    resetCreateForm()
+    router.push({ name: 'workflowBuilder', params: { id: created.id } })
+  } catch (error) {
+    ElMessage.error(error.message || '创建失败')
+  }
 }
 
 function handleEdit(flow) {
@@ -149,15 +199,6 @@ async function handleDelete(flow) {
     if (error !== 'cancel') {
       ElMessage.error(error.message || '删除失败')
     }
-  }
-}
-
-async function handleRun(flow) {
-  try {
-    await store.run(flow.id, { input: 'preview-run' })
-    ElMessage.success('已提交运行')
-  } catch (error) {
-    ElMessage.error(error.message || '运行失败')
   }
 }
 

@@ -17,13 +17,22 @@ export const useAgentsStore = defineStore('agents', () => {
     try {
       const data = await getAgents(params)
       // 兼容返回结构：若后端直接返回数组或 {items,total}
-      if (Array.isArray(data)) {
-        list.value = data.filter(a => a.status !== 'published')
-        total.value = data.length
-      } else if (data && typeof data === 'object') {
-        list.value = (data.items || []).filter(a => a.status !== 'published')
-        total.value = data.total ?? list.value.length
+      const items = Array.isArray(data)
+        ? data
+        : (data && typeof data === 'object'
+          ? data.items || []
+          : [])
+
+      // 按需要过滤：指定 status=published 时仅返回已发布；指定 status=draft 时过滤掉已发布；未指定则保留全部供前端自行过滤
+      if (params.status === 'published') {
+        list.value = items.filter(a => a.status === 'published')
+      } else if (params.status === 'draft') {
+        list.value = items.filter(a => a.status !== 'published')
+      } else {
+        list.value = items
       }
+
+      total.value = data?.total ?? list.value.length
     } finally {
       loadingList.value = false
     }

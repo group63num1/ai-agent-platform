@@ -116,10 +116,14 @@ app.get('/api/v1/menus', auth, (req, res) => {
 
 // Agents 列表（不强制鉴权，避免前端清除真实后端的 token）
 app.get('/api/agents', (req, res) => {
-  // 支持简单查询 & 分页
-  let { page = 1, pageSize = 20, keyword = '' } = req.query
+  // 支持简单查询 & 分页 & 状态筛选
+  let { page = 1, pageSize = 20, keyword = '', status } = req.query
   page = parseInt(page); pageSize = parseInt(pageSize)
-  let items = AGENTS.filter(a => !keyword || a.name.includes(keyword) || a.description.includes(keyword))
+  let items = AGENTS.filter(a => {
+    const matchKw = !keyword || a.name?.includes(keyword) || a.description?.includes(keyword)
+    const matchStatus = status ? a.status === status : true
+    return matchKw && matchStatus
+  })
   const total = items.length
   const start = (page - 1) * pageSize
   const end = start + pageSize
@@ -179,6 +183,40 @@ app.post('/api/agents/:id/publish', (req, res) => {
   AGENTS[idx].status = 'published'
   AGENTS[idx].updatedAt = Date.now()
   res.json(ok({ id: AGENTS[idx].id, status: AGENTS[idx].status }))
+})
+
+// 获取所有已发布智能体
+app.get('/api/agents/published', (req, res) => {
+  const items = AGENTS.filter(a => a.status === 'published')
+  res.json(ok({ items, total: items.length }))
+})
+
+// 会话管理（简单模拟）
+const AGENT_SESSIONS = {} // { [agentId]: [{ sessionId, name, createdAt }] }
+app.get('/api/agents/:id/sessions', (req, res) => {
+  const agentId = req.params.id
+  if (!AGENTS.find(a => a.id === agentId)) return res.status(404).json(fail(404, '未找到智能体'))
+  const items = AGENT_SESSIONS[agentId] || []
+  res.json(ok({ items, total: items.length }))
+})
+app.post('/api/agents/:id/sessions', (req, res) => {
+  const agentId = req.params.id
+  if (!AGENTS.find(a => a.id === agentId)) return res.status(404).json(fail(404, '未找到智能体'))
+  const { name = '会话' } = req.body || {}
+  const session = { sessionId: nanoid(10), name, createdAt: Date.now() }
+  AGENT_SESSIONS[agentId] = AGENT_SESSIONS[agentId] || []
+  AGENT_SESSIONS[agentId].push(session)
+  res.json(ok(session))
+})
+app.delete('/api/agents/:id/sessions/:sessionId', (req, res) => {
+  const agentId = req.params.id
+  const sid = req.params.sessionId
+  const list = AGENT_SESSIONS[agentId] || []
+  const idx = list.findIndex(s => s.sessionId === sid)
+  if (idx === -1) return res.status(404).json(fail(404, '未找到会话'))
+  list.splice(idx, 1)
+  AGENT_SESSIONS[agentId] = list
+  res.json(ok({ deleted: true }))
 })
 
 // 与智能体对话（简单模拟，根据设置返回拼接内容）

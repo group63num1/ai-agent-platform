@@ -15,8 +15,8 @@
       <div class="flex items-center gap-2">
         <span class="text-xs text-gray-400 mr-2">Tips: 拖拽左侧组件至画布 | 选中连线按 Delete 删除</span>
         <el-button @click="seedDefault" size="small">重置画布</el-button>
-        <el-button :loading="store.running" @click="handleRun" size="small" icon="VideoPlay">试运行</el-button>
         <el-button type="primary" :loading="store.saving" @click="handleSave" size="small" icon="Check">保存</el-button>
+        <el-button :loading="store.running" @click="handleRun" size="small" icon="VideoPlay">运行</el-button>
       </div>
     </header>
 
@@ -31,7 +31,7 @@
         <div class="flex-1 overflow-y-auto p-3 space-y-6">
           
           <!-- 智能体节点分类 -->
-          <div>
+          <!-- <div>
             <h3 class="text-xs font-bold text-gray-400 uppercase mb-3 tracking-wider flex items-center gap-1">
               <el-icon><User /></el-icon> 基础智能体
             </h3>
@@ -79,6 +79,32 @@
                 <el-icon class="text-gray-400"><Rank /></el-icon>
               </div>
               <div class="text-xs text-gray-400 mt-1">执行搜索/计算/API</div>
+            </div>
+          </div> -->
+
+          <!-- 已发布 Agent 列表（后端真实数据，可直接拖入画布） -->
+          <div>
+            <h3 class="text-xs font-bold text-gray-400 uppercase mb-3 tracking-wider flex items-center gap-1">
+              <el-icon><UserFilled /></el-icon> 已发布 Agent
+              <el-tag v-if="agentsStore.loadingList" size="small" effect="plain">加载中...</el-tag>
+            </h3>
+            <template v-if="publishedAgents.length">
+              <div 
+                v-for="agent in publishedAgents" 
+                :key="agent.id"
+                class="palette-item group"
+                draggable="true"
+                @dragstart="(e) => onDragStart(e, { type: 'agent-simple', label: agent.name || agent.id, sub: agent.description || '已发布 Agent', agentId: agent.id })"
+              >
+                <div class="flex items-center justify-between">
+                  <span class="font-medium text-gray-700 text-sm truncate">{{ agent.name || agent.id }}</span>
+                  <el-icon class="text-gray-400"><Rank /></el-icon>
+                </div>
+                <div class="text-xs text-gray-400 mt-1 line-clamp-2">{{ agent.description || '已发布 Agent，可直接绑定' }}</div>
+              </div>
+            </template>
+            <div v-else class="text-xs text-gray-400 bg-gray-50 border border-dashed border-gray-200 rounded p-3">
+              {{ agentsStore.loadingList ? '正在加载已发布 Agent...' : '暂无已发布 Agent，请先在「智能体」页面发布后再使用' }}
             </div>
           </div>
 
@@ -308,6 +334,26 @@
                 </p>
               </div>
 
+              <!-- 绑定后端 Agent -->
+              <div class="pt-2 border-t border-gray-100">
+                <label class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">选择已发布 Agent</label>
+                <el-select
+                  v-model="selectedNode.meta.agentId"
+                  placeholder="选择后端已发布的 Agent"
+                  filterable
+                  size="small"
+                  class="w-full"
+                >
+                  <el-option
+                    v-for="agent in publishedAgents"
+                    :key="agent.id"
+                    :label="agent.name || agent.id"
+                    :value="agent.id"
+                  />
+                </el-select>
+                <p class="text-xs text-amber-500 mt-1" v-if="!selectedNode.meta.agentId">保存前请绑定真实 Agent，否则后端会返回 400。</p>
+              </div>
+
               <!-- 关联资源选择 (仅示意) -->
               <div v-if="selectedNode.type === 'agent-knowledge'" class="pt-2 border-t border-gray-100">
                 <label class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">关联知识库</label>
@@ -366,7 +412,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   Back, VideoPlay, Check, Rank, Setting, ArrowRight,
   User, Tools, SwitchButton, MoreFilled, InfoFilled, CopyDocument, Delete,
@@ -413,6 +459,7 @@ const meta = reactive({
 
 const isNew = computed(() => !route.params.id)
 const selectedNode = computed(() => nodes.value.find(n => n.id === selectedNodeId.value))
+const publishedAgents = computed(() => (agentsStore.list || []).filter(a => a.status === 'published'))
 
 // --- 计算属性 ---
 
@@ -535,7 +582,8 @@ function onDrop(evt) {
     meta: { 
       userPrompt: '', // 用户提示词字段
       knowledgeBaseId: '', 
-      pluginId: ''
+      pluginId: '',
+      agentId: item.agentId || '' // 绑定后端已发布 Agent（拖拽真实 Agent 时自动填充）
     }
   }
   nodes.value.push(node)
@@ -696,6 +744,33 @@ async function loadWorkflow(id) {
       console.error('Parse graph error', e)
       seedDefault()
     }
+  } else if (Array.isArray(wf.agentIds)) {
+    // 后端仅返回 agentIds 时，用简单线性布局复原
+    const baseX = 150
+    const baseY = 250
+    const gap = 220
+    nodes.value = [
+      { id: 'start', type: 'start', label: 'Start', description: 'Input', x: 30, y: baseY, meta: {} },
+      ...wf.agentIds.map((aid, idx) => ({
+        id: `node-${idx + 1}`,
+        type: 'agent-simple',
+        label: `Agent ${idx + 1}`,
+        description: '已发布 Agent',
+        x: baseX + gap * idx,
+        y: baseY,
+        meta: { agentId: aid, userPrompt: '', knowledgeBaseId: '', pluginId: '' }
+      })),
+      { id: 'end', type: 'end', label: 'End', description: 'Output', x: baseX + gap * (wf.agentIds.length || 1), y: baseY, meta: {} }
+    ]
+    edges.value = wf.agentIds.map((_, idx) => ({
+      id: `edge-${idx + 1}`,
+      from: idx === 0 ? 'start' : `node-${idx}`,
+      to: `node-${idx + 1}`
+    })).concat([{
+      id: 'edge-end',
+      from: wf.agentIds.length ? `node-${wf.agentIds.length}` : 'start',
+      to: 'end'
+    }])
   } else {
     // 旧数据兼容：略
     seedDefault()
@@ -719,43 +794,59 @@ function serializeSteps() {
 
 async function handleSave() {
   if (!meta.name) return ElMessage.warning('请输入工作流名称')
-  
-  // 1. 业务数据 (给执行引擎)
   const orderedSteps = serializeSteps()
-  const agentIds = orderedSteps.map(s => s.id) // 暂用节点ID占位，实际逻辑看后端需求
-  
-  // 2. 图形数据 (给前端还原)
-  const graphData = {
-    nodes: nodes.value,
-    edges: edges.value
+  const agentIds = orderedSteps.map(s => s.meta.agentId).filter(Boolean)
+  const nodeInputs = orderedSteps.map(s => s.meta.userPrompt || '')
+  if (agentIds.length !== orderedSteps.length) {
+    return ElMessage.warning('请为所有节点绑定已发布的 Agent')
   }
 
-  const payload = {
-    name: meta.name,
-    intro: meta.description,
-    triggerType: meta.triggerType,
-    agentIds: agentIds, // 注意：如果后端强依赖 agentID 表，可能需要在这里做转换
-    extra: JSON.stringify({ steps: orderedSteps }), // 将配置存入 extra 字段
-    graphData: JSON.stringify(graphData)
-  }
-
+  // 先确保工作流实体存在
+  let workflowId = route.params.id
   if (isNew.value) {
-    const created = await store.create(payload)
-    ElMessage.success('创建成功')
-    router.replace({ name: 'workflowBuilder', params: { id: created.id } })
-  } else {
-    await store.update(route.params.id, payload)
-    ElMessage.success('保存成功')
+    const created = await store.create({ name: meta.name, intro: meta.description })
+    workflowId = created.id
+    router.replace({ name: 'workflowBuilder', params: { id: workflowId } })
   }
+
+  // 保存节点顺序、提示词和画布结构，便于运行时复用
+  const graphData = { nodes: nodes.value, edges: edges.value }
+  await store.update(workflowId, { agentIds, nodeInputs, graphData })
+  ElMessage.success('保存成功')
 }
 
 async function handleRun() {
-  await store.run(route.params.id, {})
+  if (!route.params.id && isNew.value) {
+    return ElMessage.warning('请先保存工作流后再运行')
+  }
+
+  const orderedSteps = serializeSteps()
+  const agentIds = orderedSteps.map(s => s.meta.agentId).filter(Boolean)
+  if (!agentIds.length) {
+    return ElMessage.warning('请先添加并绑定 Agent 后再运行')
+  }
+
+  const { value: inputValue } = await ElMessageBox.prompt('请输入运行时初始输入', '运行工作流', {
+    confirmButtonText: '运行',
+    cancelButtonText: '取消',
+    inputPlaceholder: '例如：帮我总结最新的产品更新',
+    inputValue: ''
+  }).catch(() => ({ value: null }))
+
+  if (inputValue === null || inputValue === undefined) return
+
+  const nodeInputs = orderedSteps.map(step => step.meta.userPrompt || '')
+  const graphData = { nodes: nodes.value, edges: edges.value }
+  const workflowId = route.params.id
+  // 这里还是没有传图信息
+  //await store.run(workflowId, { input: inputValue, nodeInputs, graphData })
+  await store.run(workflowId, { input: inputValue, nodeInputs})
   ElMessage.success('运行命令已发送')
 }
 
 onMounted(async () => {
   window.addEventListener('keydown', onKeyDown)
+  await agentsStore.fetchList({ status: 'published' })
   if (route.params.id) {
     await loadWorkflow(route.params.id)
   } else {
