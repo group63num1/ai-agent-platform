@@ -48,6 +48,53 @@
             </div>
           </div>
 
+            <!-- 运行结果弹窗 -->
+            <el-dialog
+              v-model="showRunResult"
+              title="运行结果"
+              width="720px"
+              :close-on-click-modal="false"
+            >
+              <div v-if="runResult" class="space-y-4">
+                <div class="flex flex-wrap gap-3 text-sm text-gray-600">
+                  <el-tag size="small" type="info">Workflow: {{ runResult.workflowId || 'N/A' }}</el-tag>
+                  <el-tag size="small" type="success">Session: {{ runResult.sessionId || 'N/A' }}</el-tag>
+                </div>
+
+                <div>
+                  <div class="text-xs font-semibold text-gray-500 mb-2">最终输出</div>
+                  <el-input
+                    type="textarea"
+                    :rows="4"
+                    v-model="runResult.output"
+                    readonly
+                    class="text-sm"
+                  />
+                </div>
+
+                <div>
+                  <div class="text-xs font-semibold text-gray-500 mb-2">节点输出</div>
+                  <el-timeline>
+                    <el-timeline-item
+                      v-for="(node, idx) in runResult.nodeResults || []"
+                      :key="idx"
+                      :timestamp="node.agentId"
+                      placement="top"
+                    >
+                      <div class="bg-gray-50 border border-gray-100 rounded p-3 text-sm text-gray-700 whitespace-pre-line">
+                        {{ node.output || '无输出' }}
+                      </div>
+                    </el-timeline-item>
+                  </el-timeline>
+                </div>
+              </div>
+              <template #footer>
+                <span class="dialog-footer">
+                  <el-button @click="showRunResult = false">关闭</el-button>
+                </span>
+              </template>
+            </el-dialog>
+
           <div>
             <h3 class="text-xs font-bold text-gray-400 uppercase mb-3 tracking-wider flex items-center gap-1">
               <el-icon><Collection /></el-icon> 知识增强
@@ -457,6 +504,9 @@ const meta = reactive({
   status: 'draft',
 })
 
+const showRunResult = ref(false)
+const runResult = ref(null)
+
 const isNew = computed(() => !route.params.id)
 const selectedNode = computed(() => nodes.value.find(n => n.id === selectedNodeId.value))
 const publishedAgents = computed(() => (agentsStore.list || []).filter(a => a.status === 'published'))
@@ -839,9 +889,11 @@ async function handleRun() {
   const graphData = { nodes: nodes.value, edges: edges.value }
   const workflowId = route.params.id
   // 这里还是没有传图信息
-  //await store.run(workflowId, { input: inputValue, nodeInputs, graphData })
-  await store.run(workflowId, { input: inputValue, nodeInputs})
-  ElMessage.success('运行命令已发送')
+  // const resp = await store.run(workflowId, { input: inputValue, nodeInputs, graphData })
+  const resp = await store.run(workflowId, { input: inputValue, nodeInputs, graphData })
+  runResult.value = resp
+  showRunResult.value = true
+  ElMessage.success('运行完成')
 }
 
 onMounted(async () => {
