@@ -85,7 +85,6 @@ def _get_agent(
             "top_k",
             "frequency_penalty",
             "presence_penalty",
-            "stop_sequences",
             "timeout",
         ]:
             val = getattr(model_info, attr, None)
@@ -117,7 +116,6 @@ def _get_agent(
                 "top_k",
                 "frequency_penalty",
                 "presence_penalty",
-                "stop_sequences",
                 "timeout",
             ]:
                 val = getattr(model_info, attr, None)

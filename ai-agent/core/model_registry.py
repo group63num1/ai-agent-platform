@@ -26,7 +26,6 @@ class ModelInfo:
     top_k: Optional[int] = None
     frequency_penalty: Optional[float] = None
     presence_penalty: Optional[float] = None
-    stop_sequences: Optional[List[str]] = None
     stream: Optional[bool] = True
     timeout: Optional[int] = None
     retry_max_attempts: Optional[int] = None
@@ -81,7 +80,6 @@ class ModelRegistry:
                     top_k=db_model.get("top_k"),
                     frequency_penalty=db_model.get("frequency_penalty"),
                     presence_penalty=db_model.get("presence_penalty"),
-                    stop_sequences=db_model.get("stop_sequences"),
                     stream=db_model.get("stream", True),
                     timeout=db_model.get("timeout"),
                     retry_max_attempts=db_model.get("retry_max_attempts"),

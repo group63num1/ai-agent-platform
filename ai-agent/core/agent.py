@@ -27,7 +27,6 @@ class SimpleOpenAILLM(BaseChatModel):
     top_k: Optional[int] = None
     frequency_penalty: Optional[float] = None
     presence_penalty: Optional[float] = None
-    stop_sequences: Optional[List[str]] = None
     timeout: Optional[int] = None
 
     def __init__(
@@ -121,9 +120,6 @@ class SimpleOpenAILLM(BaseChatModel):
                 data["frequency_penalty"] = self.frequency_penalty
             if hasattr(self, "presence_penalty") and self.presence_penalty is not None:
                 data["presence_penalty"] = self.presence_penalty
-            if hasattr(self, "stop_sequences") and self.stop_sequences:
-                # OpenAI 兼容接口为 'stop'
-                data["stop"] = self.stop_sequences
             if hasattr(self, "_bound_tools") and self._bound_tools:
                 tools_schema = []
                 for tool in self._bound_tools:
@@ -263,7 +259,6 @@ class LangChainAgent:
             "top_k",
             "frequency_penalty",
             "presence_penalty",
-            "stop_sequences",
             "timeout",
         ]:
             if hasattr(self.llm, attr):
@@ -343,7 +338,7 @@ class LangChainAgent:
             # 构建rag_library内容（如需支持RAG，可在此处生成）
             rag_library = None
             if enable_rag and self._knowledge_bases:
-                # 提供详细的 RAG 使用说明
+                # 提供详细的 RAG 使用说明用
                 rag_library = f"""知识库检索功能已启用（知识库数: {len(self._knowledge_bases)}）。
 使用说明:
 1. 检索策略: 系统会从指定知识库中取 Top-10 个相关结果，但只返回相似度 ≥ 0.6 的内容
@@ -351,7 +346,7 @@ class LangChainAgent:
 2. 查询优化: 不要直接使用用户的原始问题，而应该提取关键信息或重新表述
    - 例如: 用户问"你能告诉我机器学习是什么吗?" → 查询应为"机器学习定义"
    - 例如: 用户问"深度学习有哪些应用场景?" → 查询应为"深度学习应用场景"
-3. 调用时机: 当需要查询专业知识、历史信息或文档内容时使用以及你觉得缺少信息时可以使用试试"""
+3. 调用时机: 当需要查询专业知识、历史信息或文档内容时使以及你觉得缺少信息时可以使用试试"""
 
             while reasoning_steps < max_reasoning_steps and not has_sufficient_info:
                 reasoning_steps += 1
@@ -382,7 +377,6 @@ class LangChainAgent:
                     "top_k",
                     "frequency_penalty",
                     "presence_penalty",
-                    "stop_sequences",
                     "timeout",
                 ]:
                     if hasattr(self.llm, attr):
@@ -413,11 +407,36 @@ class LangChainAgent:
 
                 # 如果决策是调用工具
                 if decision == "TOOL_CALL" and tool_call_instruction:
-                    tool_result = self._execute_tool_instruction(
-                        tool_call_instruction, tools_info
-                    )
+                    # 支持单条或多条工具调用
+                    tool_calls_payload = tool_call_instruction
+
+                    # 如果是列表(JSON字符串)，逐条执行并汇总
+                    tool_results_text = ""
+                    try:
+                        parsed_calls = json.loads(tool_calls_payload)
+                        if isinstance(parsed_calls, list):
+                            results = []
+                            for idx, call in enumerate(parsed_calls, 1):
+                                call_json = json.dumps(call)
+                                result_text = self._execute_tool_instruction(
+                                    call_json, tools_info
+                                )
+                                results.append(f"[调用{idx}] {result_text}")
+                            tool_results_text = "\n".join(results)
+                        else:
+                            # 单条（dict）
+                            call_json = json.dumps(parsed_calls)
+                            tool_results_text = self._execute_tool_instruction(
+                                call_json, tools_info
+                            )
+                    except json.JSONDecodeError:
+                        # 保持兼容旧的字符串格式
+                        tool_results_text = self._execute_tool_instruction(
+                            tool_call_instruction, tools_info
+                        )
+
                     # 更新上下文，继续推理
-                    user_input = f"{user_input}\n\n[工具调用结果]\n{tool_result}"
+                    user_input = f"{user_input}\n\n[工具调用结果]\n{tool_results_text}"
                     continue
 
                 # 如果决策是直接回答，标记为有足够信息
@@ -448,7 +467,6 @@ class LangChainAgent:
                     "top_k",
                     "frequency_penalty",
                     "presence_penalty",
-                    "stop_sequences",
                     "timeout",
                 ]:
                     if hasattr(self.llm, attr):
@@ -571,7 +589,6 @@ class LangChainAgent:
             "top_k",
             "frequency_penalty",
             "presence_penalty",
-            "stop_sequences",
             "timeout",
         ]:
             if hasattr(self.llm, attr):
@@ -607,8 +624,6 @@ class LangChainAgent:
             and streaming_llm.presence_penalty is not None
         ):
             data["presence_penalty"] = streaming_llm.presence_penalty
-        if hasattr(streaming_llm, "stop_sequences") and streaming_llm.stop_sequences:
-            data["stop"] = streaming_llm.stop_sequences
 
         logger.info(
             f"[_stream_generate] 调用 API: {streaming_llm.base_url}/chat/completions"
@@ -700,10 +715,12 @@ class LangChainAgent:
         # 推理规范与过程合并
         if (tools_library and tools_library != "当前无可用工具") or rag_library:
             prompt += f"\n【推理流程】\n- 推理轮次：{reasoning_step}/{max_steps}\n- 每步判断信息是否足够，足够则直接输出最终回答，不足则继续推理或调用工具/知识库。\n- 达到推理上限（{max_steps}次）时必须给出最终回答。\n"
-
+            prompt += "- 若工具/知识库已不需再调用，直接生成最终答案。\n"
         # 输出格式
         if tools_library and tools_library != "当前无可用工具":
-            prompt += '\n【输出格式】\n工具调用请输出JSON格式：\n{\n  "tool_call": {\n    "tool_name": "工具名称",\n    "method": "GET/POST",\n    "url": "https://api.example.com/endpoint",\n    "parameters": {"param1": "value1", "param2": "value2"}\n  }\n}\n若必填参数信息不足，输出：\n【缺少必填字段】\n缺少字段：xxx, yyy\n'
+            prompt += '\n【输出格式】\n- 单次调用：\n{\n  "tool_call": {\n    "tool_name": "工具名称",\n    "method": "GET/POST",\n    "url": "https://api.example.com/endpoint",\n    "parameters": {"param1": "value1", "param2": "value2"}\n  }\n}\n'
+            prompt += '\n- 多次调用（按顺序依次执行，同一插件多次也用此格式）：\n{\n  "tool_calls": [\n    {"tool_name": "...", "method": "POST", "url": "...", "parameters": {...}},\n    {"tool_name": "...", "method": "POST", "url": "...", "parameters": {...}}\n  ]\n}\n'
+            prompt += "若必填参数信息不足，输出：\n【缺少必填字段】\n缺少字段：xxx, yyy\n必须直接向用户说明正在调用工具缺少哪些字段并请求补充。\n"
         if rag_library:
             prompt += '\n知识库检索请输出如下JSON：\n{"rag_query": "你的检索问题"}\n'
         prompt += "\n如果直接回答，输出格式如下：\n\n【最终回答】\n[这里输出完整的用自然语言的回答]\n"
@@ -745,32 +762,45 @@ class LangChainAgent:
         try:
             # 尝试直接解析整个返回为JSON
             parsed_json = json.loads(reasoning_result)
+            # 支持多次调用：tool_calls 为列表
+            if isinstance(parsed_json, dict):
+                # RAG 单次
+                if "rag_query" in parsed_json:
+                    rag_query_text = parsed_json["rag_query"]
+                    tool_call_instruction = json.dumps(
+                        {"type": "rag_query", "query": rag_query_text}
+                    )
+                    decision = "TOOL_CALL"
+                    return (
+                        decision,
+                        tool_call_instruction,
+                        final_answer,
+                        has_sufficient_info,
+                    )
 
-            # 检查是否是 RAG 查询
-            if "rag_query" in parsed_json:
-                rag_query_text = parsed_json["rag_query"]
-                # 使用特殊标记表示这是 RAG 调用
-                tool_call_instruction = json.dumps(
-                    {"type": "rag_query", "query": rag_query_text}
-                )
-                decision = "TOOL_CALL"
-                return (
-                    decision,
-                    tool_call_instruction,
-                    final_answer,
-                    has_sufficient_info,
-                )
+                # 单条工具调用
+                if "tool_call" in parsed_json:
+                    tool_call_instruction = json.dumps(parsed_json["tool_call"])
+                    decision = "TOOL_CALL"
+                    return (
+                        decision,
+                        tool_call_instruction,
+                        final_answer,
+                        has_sufficient_info,
+                    )
 
-            # 检查是否是工具调用
-            if "tool_call" in parsed_json:
-                tool_call_instruction = json.dumps(parsed_json["tool_call"])
-                decision = "TOOL_CALL"
-                return (
-                    decision,
-                    tool_call_instruction,
-                    final_answer,
-                    has_sufficient_info,
-                )
+                # 多条工具调用
+                if "tool_calls" in parsed_json and isinstance(
+                    parsed_json.get("tool_calls"), list
+                ):
+                    tool_call_instruction = json.dumps(parsed_json["tool_calls"])
+                    decision = "TOOL_CALL"
+                    return (
+                        decision,
+                        tool_call_instruction,
+                        final_answer,
+                        has_sufficient_info,
+                    )
         except json.JSONDecodeError:
             # 如果整体解析失败，尝试查找JSON片段
             try:
@@ -810,6 +840,20 @@ class LangChainAgent:
                         if "tool_call" in tool_call_json:
                             tool_call_instruction = json.dumps(
                                 tool_call_json["tool_call"]
+                            )
+                            decision = "TOOL_CALL"
+                            return (
+                                decision,
+                                tool_call_instruction,
+                                final_answer,
+                                has_sufficient_info,
+                            )
+
+                        if "tool_calls" in tool_call_json and isinstance(
+                            tool_call_json.get("tool_calls"), list
+                        ):
+                            tool_call_instruction = json.dumps(
+                                tool_call_json["tool_calls"]
                             )
                             decision = "TOOL_CALL"
                             return (

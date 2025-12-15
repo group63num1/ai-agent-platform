@@ -47,7 +47,6 @@ class ModelDB(Base):
     top_k = Column(Integer, nullable=True, comment="RAG/核心采样候选词数量")
     frequency_penalty = Column(Float, nullable=True, comment="避免重复")
     presence_penalty = Column(Float, nullable=True, comment="鼓励新话题")
-    stop_sequences = Column(JSON, nullable=True, comment="停止序列")
     stream = Column(Boolean, default=True, comment="流式输出")
     timeout = Column(Integer, nullable=True, comment="超时时间(秒)")
     retry_max_attempts = Column(Integer, nullable=True, comment="最大重试次数")
@@ -68,7 +67,6 @@ class ModelDB(Base):
             "top_k": self.top_k,
             "frequency_penalty": self.frequency_penalty,
             "presence_penalty": self.presence_penalty,
-            "stop_sequences": self.stop_sequences,
             "stream": self.stream,
             "timeout": self.timeout,
             "retry_max_attempts": self.retry_max_attempts,
@@ -344,7 +342,6 @@ def create_model(
     top_k: Optional[int] = None,
     frequency_penalty: Optional[float] = None,
     presence_penalty: Optional[float] = None,
-    stop_sequences: Optional[List[str]] = None,
     stream: Optional[bool] = True,
     timeout: Optional[int] = None,
     retry_max_attempts: Optional[int] = None,
@@ -366,7 +363,6 @@ def create_model(
             top_k=top_k,
             frequency_penalty=frequency_penalty,
             presence_penalty=presence_penalty,
-            stop_sequences=stop_sequences,
             stream=stream,
             timeout=timeout,
             retry_max_attempts=retry_max_attempts,
@@ -408,7 +404,6 @@ def list_models(enabled_only: bool = False) -> List[dict]:
                 "top_k": m.top_k,
                 "frequency_penalty": m.frequency_penalty,
                 "presence_penalty": m.presence_penalty,
-                "stop_sequences": m.stop_sequences,
                 "stream": m.stream,
                 "timeout": m.timeout,
                 "retry_max_attempts": m.retry_max_attempts,

@@ -20,22 +20,9 @@ def test_create_only():
     user_id = "test_user"
     kb_name = "test_kb_create_query"
 
-    # 从 cache 文件夹读取测试文件
-    cache_dir = Path("cache")
+    # 构造“完全无文件”测试：files 发送空列表
     test_files = []
-
-    for file_path in ["ai_history.txt", "deep_learning.txt", "machine_learning.txt"]:
-        full_path = cache_dir / file_path
-        if full_path.exists():
-            with open(full_path, "r", encoding="utf-8") as f:
-                test_files.append({"filename": file_path, "content": f.read()})
-            print(f"   ✓ 已加载: {file_path}")
-        else:
-            print(f"   ✗ 文件不存在: {file_path}")
-
-    if not test_files:
-        print("   ❌ 没有找到测试文件")
-        return
+    print("   ✓ 已构造空文件列表: files=[]")
 
     # 步骤1: 创建知识库
     print("\n📌 步骤 1: 创建知识库")

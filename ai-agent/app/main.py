@@ -89,6 +89,25 @@ app.add_middleware(
 # ==================== 1. Chat 接口 ====================
 
 
+@app.get("/api/models")
+async def list_models_api():
+    """返回模型库中的全部模型名称及基本信息"""
+    try:
+        from core.database import list_models
+
+        items = list_models(enabled_only=False)
+        names = [m.get("display_name") or m.get("model_id") for m in items]
+        return {
+            "success": True,
+            "count": len(items),
+            "models": names,
+            "items": items,
+        }
+    except Exception as e:
+        logger.error(f"列出模型失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
     """
@@ -172,11 +191,16 @@ async def create_tool(body: dict):
                 status_code=400, detail="OpenAPI 中未找到有效的路径定义"
             )
 
-        # 先清理该用户的旧工具（避免重复 key）- 通过 tool_id 前缀判断
+        # 只删除即将创建的同名工具（避免重复 key）
+        from core.database import list_tools, delete_tool
+
         existing_tools = list_tools()
+        new_tool_ids = [f"{user_id}_{tf['operation_id']}" for tf in tool_fields_list]
+
         for tool in existing_tools:
-            if tool["tool_id"].startswith(f"{user_id}_"):
+            if tool["tool_id"] in new_tool_ids:
                 delete_tool(tool["tool_id"])
+                logger.info(f"删除旧工具: {tool['tool_id']}")
 
         # 为每个端点创建工具
         created_tools = []
@@ -302,6 +326,9 @@ async def create_knowledge_base_api(req: KnowledgeBaseCreateRequest):
         from core.knowledge_service import get_kb_service
 
         kb_service = get_kb_service()
+
+        if not req.user_id or not str(req.user_id).strip():
+            raise HTTPException(status_code=400, detail="user_id 不能为空")
 
         result = kb_service.create_knowledge_base(
             user_id=req.user_id,

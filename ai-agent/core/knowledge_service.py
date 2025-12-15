@@ -5,6 +5,7 @@
 import os
 import hashlib
 import logging
+import shutil
 from pathlib import Path
 from typing import List, Dict, Optional, Any
 from datetime import datetime
@@ -94,9 +95,12 @@ class KnowledgeBaseService:
             filename = file_info.get("filename")
             content = file_info.get("content")
 
-            if not filename or content is None:
+            if not filename:
                 logger.warning(f"⚠️  文件信息不完整，跳过")
                 continue
+
+            if content is None:
+                content = ""
 
             # 保存文件
             file_path = kb_dir / filename
@@ -145,9 +149,26 @@ class KnowledgeBaseService:
                     return f.read()
 
             elif suffix == ".pdf":
-                # TODO: 实现 PDF 解析
-                logger.warning(f"⚠️  暂不支持 PDF 格式: {file_path}")
-                return ""
+                # 仅使用 pypdf 解析 PDF（不回退到 PyPDF2）
+                try:
+                    from pypdf import PdfReader
+
+                    logger.info("ℹ️ 使用 pypdf 解析 PDF")
+
+                    reader = PdfReader(str(file_path))
+                    texts = []
+                    for page in reader.pages:
+                        try:
+                            page_text = page.extract_text() or ""
+                        except Exception:
+                            page_text = ""
+                        texts.append(page_text)
+
+                    return "\n".join(texts)
+                except Exception as e:
+                    logger.error(f"❌ 解析 PDF 失败 {file_path}: {e}")
+                    logger.warning(f"⚠️  若要支持 PDF，请安装依赖: pip install pypdf")
+                    return ""
 
             else:
                 logger.warning(f"⚠️  不支持的文件格式: {suffix}")
@@ -232,12 +253,17 @@ class KnowledgeBaseService:
         all_chunks = []
 
         for file_path in file_paths:
-            content = self.load_document_content(file_path)
-            if not content:
+            path_obj = Path(file_path)
+            if not path_obj.is_file():
+                logger.warning(f"⚠️ 非文件路径，跳过: {path_obj}")
                 continue
 
+            content = self.load_document_content(file_path)
+            if content is None:
+                content = ""
+
             try:
-                chunks = splitter.split_text(content)
+                chunks = splitter.split_text(content) if content else [""]
                 for chunk_idx, chunk in enumerate(chunks):
                     all_chunks.append(
                         {
@@ -280,17 +306,77 @@ class KnowledgeBaseService:
         Returns:
             创建结果
         """
+        kb_id = self.generate_kb_id(user_id, name)
+        logger.info(f"📝 创建知识库: {kb_id}")
+
+        kb_dir = self.document_root / kb_id
+        milvus_client = None
+        milvus_created = False
+        success = False
+
         try:
-            # 1. 生成知识库 ID
-            kb_id = self.generate_kb_id(user_id, name)
-            logger.info(f"📝 创建知识库: {kb_id}")
-
-            # 2. 保存上传的文件
+            # 1. 保存上传的文件
             file_paths = self.save_uploaded_files(kb_id, files)
-            if not file_paths:
-                return {"success": False, "error": "没有成功保存任何文件"}
 
-            # 3. 对文档进行 chunking
+            # 支持“完全没有文件”的场景：files 为空列表时也继续创建
+            if not file_paths:
+                if not files:  # 用户明确传了空列表
+                    logger.warning(
+                        "⚠️ 收到空文件列表，创建空知识库，仅创建目录/DB/Milvus，无向量"
+                    )
+
+                    # 记录知识库目录作为占位路径，避免 file_paths 为空
+                    kb_dir = self.document_root / kb_id
+                    kb_dir.mkdir(parents=True, exist_ok=True)
+                    placeholder_paths = [str(kb_dir)]
+
+                    # 直接创建一个空的 Milvus 集合，使用常用向量维度 768
+                    default_dim = 768
+                    milvus_client = MilvusClient(collection_name=kb_id)
+                    milvus_client.create_collection_if_not_exists(
+                        collection_name=kb_id,
+                        vector_dim=default_dim,
+                        similarity_metric="IP",
+                    )
+                    milvus_created = True
+
+                    with get_session() as session:
+                        kb = KnowledgeBaseDB(
+                            kb_id=kb_id,
+                            user_id=user_id,
+                            name=name,
+                            description=description,
+                            file_paths=placeholder_paths,
+                            chunking_method=chunking_method,
+                            chunk_size=chunk_size,
+                            chunk_overlap=chunk_overlap,
+                            total_chunks=0,
+                            milvus_collection=kb_id,
+                            enabled=enabled,
+                            created_at=datetime.now().isoformat(),
+                            updated_at=datetime.now().isoformat(),
+                        )
+                        session.add(kb)
+                        session.commit()
+                        logger.info(
+                            "✅ 空知识库信息已保存到数据库，并创建了空集合，记录占位路径"
+                        )
+
+                    success = True
+                    return {
+                        "success": True,
+                        "kb_id": kb_id,
+                        "name": name,
+                        "total_files": 0,
+                        "total_chunks": 0,
+                        "milvus_collection": kb_id,
+                        "file_paths": placeholder_paths,
+                        "message": "已创建空知识库（无文件）",
+                    }
+                else:
+                    return {"success": False, "error": "没有成功保存任何文件"}
+
+            # 2. 对文档进行 chunking
             chunks = self.chunk_documents(
                 file_paths,
                 chunking_method=chunking_method,
@@ -306,23 +392,22 @@ class KnowledgeBaseService:
 
             logger.info(f"✅ 总共生成 {len(chunks)} 个 chunks")
 
-            # 4. 生成 embeddings
+            # 3. 生成 embeddings
             self._ensure_embeddings_loaded()
             texts = [chunk["text"] for chunk in chunks]
             embeddings = self.embeddings.embed_documents(texts)
             logger.info(f"✅ 已生成 {len(embeddings)} 个向量")
 
-            # 5. 创建 Milvus 集合并存储向量
+            # 4. 创建 Milvus 集合并存储向量
             milvus_client = MilvusClient(collection_name=kb_id)
 
-            # 创建集合
             milvus_client.create_collection_if_not_exists(
                 collection_name=kb_id,
                 vector_dim=len(embeddings[0]),
                 similarity_metric="IP",
             )
+            milvus_created = True
 
-            # 插入向量
             sources = [chunk["source"] for chunk in chunks]
             ids = milvus_client.insert_vectors(
                 texts=texts,
@@ -333,7 +418,7 @@ class KnowledgeBaseService:
 
             logger.info(f"✅ 已存储 {len(ids)} 个向量到 Milvus 集合: {kb_id}")
 
-            # 6. 保存知识库信息到数据库
+            # 5. 保存知识库信息到数据库
             with get_session() as session:
                 kb = KnowledgeBaseDB(
                     kb_id=kb_id,
@@ -354,7 +439,7 @@ class KnowledgeBaseService:
                 session.commit()
                 logger.info(f"✅ 知识库信息已保存到数据库")
 
-            milvus_client.close()
+            success = True
 
             return {
                 "success": True,
@@ -368,6 +453,26 @@ class KnowledgeBaseService:
         except Exception as e:
             logger.error(f"❌ 创建知识库失败: {e}")
             return {"success": False, "error": str(e)}
+        finally:
+            # 失败时回滚已做的变更：Milvus 集合 + 本地文件夹
+            if not success:
+                if milvus_client and milvus_created:
+                    try:
+                        milvus_client.drop_collection()
+                        logger.info(f"🗑️ 已回滚 Milvus 集合: {kb_id}")
+                    except Exception as drop_err:
+                        logger.warning(f"⚠️ 回滚 Milvus 集合失败 {kb_id}: {drop_err}")
+
+                # 清理已写入的文件夹
+                if kb_dir.exists():
+                    try:
+                        shutil.rmtree(kb_dir)
+                        logger.info(f"🗑️ 已回滚本地文件目录: {kb_dir}")
+                    except Exception as rm_err:
+                        logger.warning(f"⚠️ 回滚删除本地目录失败 {kb_dir}: {rm_err}")
+
+            if milvus_client:
+                milvus_client.close()
 
     def query_knowledge_base(
         self,
