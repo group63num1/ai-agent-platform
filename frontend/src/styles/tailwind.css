@@ -22,9 +22,30 @@
 .el-button.el-button--primary {
 	background-image: linear-gradient(135deg, #6366f1, #22d3ee) !important;
 	border: none !important;
+	color: #fff !important;
 }
 .el-button.el-button--primary.is-plain {
 	background-image: none !important;
+}
+
+/* 当使用渐变类时，确保内部文本保持白色，避免深色被覆盖不易读 */
+.el-button.el-button--primary *,
+.el-button.el-button--primary .el-button__text {
+  color: #fff !important;
+}
+
+/* 悬停/按下时稍微调整亮度，保持对比度 */
+.el-button.el-button--primary:hover {
+  filter: brightness(1.05);
+}
+.el-button.el-button--primary:active {
+  filter: brightness(0.95);
+}
+
+/* 禁用态降低饱和度但保持可读性 */
+.el-button.el-button--primary.is-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* Tag colors a bit softer */

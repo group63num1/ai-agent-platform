@@ -79,7 +79,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getAgentSessions, createAgentSession, deleteAgentSession, getAgentSessionMessages, updateAgentSessionName } from '@/api/agent'
+import { getAgentSessions, createAgentSession, deleteAgentSession, getAgentSessionMessages, updateAgentSessionName, chatAgentSessionSSE } from '@/api/agent'
 import { getAgent } from '@/api/agent'
 import { ArrowLeft } from '@element-plus/icons-vue'
 
@@ -186,41 +186,10 @@ async function sendMessage() {
   chatting.value = true
   try {
     messages.value.push({ role: 'user', content: userMessage.value })
-    // SSE POST
-    const resp = await fetch(`/api/agents/${agentId}/sessions/${activeSessionId.value}/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
-      body: JSON.stringify({ message: userMessage.value })
-    })
-    const reader = resp.body.getReader()
-    const decoder = new TextDecoder('utf-8')
     let assistantBuffer = ''
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      const chunk = decoder.decode(value, { stream: true })
-      // 解析 SSE: 按行处理，提取以 'data: ' 开头的内容
-      const lines = chunk.split(/\r?\n/)
-      for (const line of lines) {
-        if (line.startsWith('data:')) {
-          const dataStr = line.slice(5).trim()
-          if (dataStr === '[DONE]') {
-            if (assistantBuffer) {
-              messages.value.push({ role: 'assistant', content: assistantBuffer })
-              assistantBuffer = ''
-            }
-          } else {
-            try {
-              const obj = JSON.parse(dataStr)
-              if (obj?.content) {
-                assistantBuffer += obj.content
-              }
-            } catch {}
-          }
-        }
-      }
-    }
-    // 流结束但没有 [DONE] 的情况也推送一次
+    await chatAgentSessionSSE(agentId, activeSessionId.value, userMessage.value, (delta) => {
+      assistantBuffer += delta
+    })
     if (assistantBuffer) {
       messages.value.push({ role: 'assistant', content: assistantBuffer })
     }
