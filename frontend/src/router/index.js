@@ -13,6 +13,8 @@ const KnowledgeBases = () => import('@/views/KnowledgeBasesView.vue')
 const KnowledgeBaseDetail = () => import('@/views/KnowledgeBaseDetailView.vue')
 const Products = () => import('@/views/ProductsView.vue')
 const ProductChat = () => import('@/views/ProductChatView.vue')
+const Workflows = () => import('@/views/WorkflowsView.vue')
+const WorkflowBuilder = () => import('@/views/WorkflowBuilderView.vue')
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -76,6 +78,33 @@ const router = createRouter({
           }
         }
         ,
+        {
+          path: 'workflows',
+          name: 'workflows',
+          component: Workflows,
+          meta: {
+            title: '工作流编排',
+            requiresAuth: true
+          }
+        },
+        {
+          path: 'workflows/new',
+          name: 'workflowBuilderNew',
+          component: WorkflowBuilder,
+          meta: {
+            title: '新建工作流',
+            requiresAuth: true
+          }
+        },
+        {
+          path: 'workflows/:id/builder',
+          name: 'workflowBuilder',
+          component: WorkflowBuilder,
+          meta: {
+            title: '工作流编排器',
+            requiresAuth: true
+          }
+        },
         {
           path: 'agents',
           name: 'agents',

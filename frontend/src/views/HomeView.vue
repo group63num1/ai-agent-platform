@@ -158,6 +158,16 @@ const loadMenus = async () => {
       });
     }
 
+    // 确保包含工作流编排菜单
+    const hasWorkflowMenu = transformed.some(item => item.path === '/home/workflows');
+    if (!hasWorkflowMenu) {
+      transformed.splice(2, 0, {
+        title: '工作流编排',
+        path: '/home/workflows',
+        icon: iconMap.Grid
+      });
+    }
+
     // 确保包含智能体管理菜单（后端未返回时补充）
     const hasAgentsMenu = transformed.some(item => item.path === '/home/agents');
     if (!hasAgentsMenu) {
@@ -186,6 +196,7 @@ const loadMenus = async () => {
       { title: '首页', path: '/home', icon: iconMap.House },
       { title: '应用管理', path: '/home/apps', icon: iconMap.Grid },
       { title: '知识库管理', path: '/home/knowledge-bases', icon: iconMap.Grid },
+      { title: '工作流编排', path: '/home/workflows', icon: iconMap.Grid },
       { title: '插件管理', path: '/home/plugins', icon: iconMap.Setting },
       { title: '智能体管理', path: '/home/agents', icon: iconMap.Grid },
       { title: '产品管理', path: '/home/products', icon: iconMap.OfficeBuilding },
