@@ -20,8 +20,8 @@ DATABASE_TYPE: str = os.getenv("DATABASE_TYPE", "mysql")
 # MySQL/PostgreSQL 配置
 DATABASE_HOST: str = os.getenv("DATABASE_HOST", "localhost")
 DATABASE_PORT: int = int(os.getenv("DATABASE_PORT", "3307"))
-DATABASE_USER: str = os.getenv("DATABASE_USER", "new_user")
-DATABASE_PASSWORD: str = os.getenv("DATABASE_PASSWORD", "new_pass_123")
+DATABASE_USER: str = os.getenv("DATABASE_USER", "root")
+DATABASE_PASSWORD: str = os.getenv("DATABASE_PASSWORD", "123456")
 DATABASE_NAME: str = os.getenv("DATABASE_NAME", "new_db")
 
 # SQLite 配置（仅当 DATABASE_TYPE=sqlite 时使用）

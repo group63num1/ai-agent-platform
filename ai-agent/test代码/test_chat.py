@@ -8,13 +8,39 @@ import json
 import sys
 from typing import Generator
 
+# 进程内会话历史缓存（仅用于测试进程内）
+_SESSION_HISTORY: dict = {}
+# 最多保留的对话轮数（每轮包含 user + assistant）
+_MAX_TURNS = 5
+
+
+def _append_user(session_id: str, message: str):
+    _SESSION_HISTORY.setdefault(session_id, []).append(
+        {"role": "user", "content": message}
+    )
+    max_msgs = _MAX_TURNS * 2
+    if len(_SESSION_HISTORY[session_id]) > max_msgs:
+        _SESSION_HISTORY[session_id] = _SESSION_HISTORY[session_id][-max_msgs:]
+
+
+def _append_assistant(session_id: str, message: str):
+    _SESSION_HISTORY.setdefault(session_id, []).append(
+        {"role": "assistant", "content": message}
+    )
+    max_msgs = _MAX_TURNS * 2
+    if len(_SESSION_HISTORY[session_id]) > max_msgs:
+        _SESSION_HISTORY[session_id] = _SESSION_HISTORY[session_id][-max_msgs:]
+
+
+def _get_history(session_id: str):
+    return _SESSION_HISTORY.get(session_id, [])
+
 
 def stream_chat(
     message: str,
     session_id: str = "test_session",
-    kb_id: str = "be573f5d7e5f8cd6",
     user_id: str = "test_user",
-    enable_rag: bool = True,
+    enable_rag: bool = False,
     enable_tools: bool = True,
     model_id: str = "qwen3-max",
 ) -> Generator[str, None, None]:
@@ -35,21 +61,33 @@ def stream_chat(
     """
     url = "http://localhost:8000/api/chat"
 
-    # 构建请求体
+    # 将用户消息写入本地会话历史（测试进程内缓存）
+    _append_user(session_id, message)
+
+    # 构建请求体（history 从本地缓存读取；enable_rag 时填入知识库ID）
     payload = {
         "message": message,
         "session_id": session_id,
         "model_id": model_id,  # 使用正确的模型ID
         "system_prompt": None,
-        "history": [],
-        "tools": [] if not enable_tools else ["getWeatherInfo"],  # 工具列表
-        "knowledge_bases": [kb_id] if enable_rag else [],  # 知识库列表
+        "history": _get_history(session_id),
+        "tools": (
+            []
+            if not enable_tools
+            else [
+                "test_user_controlDevice",
+                "test_user_executePreset",
+                "test_user_getSensorData",
+            ]
+        ),  # 工具列表
+        "knowledge_bases": [] if not enable_rag else ["e227b5ceed636db7"],
     }
 
     try:
         response = requests.post(url, json=payload, stream=True, timeout=120)
         response.raise_for_status()
 
+        assistant_full = ""
         for line in response.iter_lines():
             if line:
                 line = line.decode("utf-8")
@@ -60,11 +98,16 @@ def stream_chat(
                     try:
                         data = json.loads(data_str)
                         if "content" in data and data["content"]:
+                            assistant_full += data["content"]
                             yield data["content"]
                         elif "error" in data:
                             yield f"\n❌ 错误: {data['error']}\n"
                     except json.JSONDecodeError:
                         continue
+
+        # 流结束后把完整回复追加到本地历史
+        if assistant_full:
+            _append_assistant(session_id, assistant_full)
     except Exception as e:
         yield f"\n❌ 请求失败: {e}\n"
 
@@ -72,9 +115,8 @@ def stream_chat(
 def non_stream_chat(
     message: str,
     session_id: str = "test_session",
-    kb_id: str = "e227b5ceed636db7",
     user_id: str = "test_user",
-    enable_rag: bool = True,
+    enable_rag: bool = False,
     enable_tools: bool = True,
     model_id: str = "qwen3-max",
 ) -> dict:
@@ -83,21 +125,32 @@ def non_stream_chat(
     """
     url = "http://localhost:8000/api/chat"
 
+    # 将用户消息写入本地会话历史（测试进程内缓存）
+    _append_user(session_id, message)
+
     payload = {
         "message": message,
         "session_id": session_id,
         "model_id": model_id,  # 使用正确的模型ID
         "system_prompt": None,
-        "history": [],
-        "tools": [] if not enable_tools else ["weather", "search"],
-        "knowledge_bases": [kb_id] if enable_rag else [],
+        "history": _get_history(session_id),
+        "tools": (
+            []
+            if not enable_tools
+            else [
+                "test_user_controlDevice",
+                "test_user_executePreset",
+                "test_user_getSensorData",
+            ]
+        ),
+        "knowledge_bases": [] if not enable_rag else ["e227b5ceed636db7"],
     }
 
     try:
         response = requests.post(url, json=payload, timeout=120)
         response.raise_for_status()
 
-        # 收集流式数据
+        # 收集流式数据或按行拼接
         full_response = ""
         for line in response.iter_lines():
             if line:
@@ -110,6 +163,10 @@ def non_stream_chat(
                             full_response += data.get("content", "")
                     except json.JSONDecodeError:
                         continue
+
+        # 把 assistant 回复追加到本地历史
+        if full_response:
+            _append_assistant(session_id, full_response)
 
         return {"success": True, "response": full_response}
     except Exception as e:
