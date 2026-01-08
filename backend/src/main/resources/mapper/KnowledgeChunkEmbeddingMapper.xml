@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.demo.app.mapper.KnowledgeChunkEmbeddingMapper">
+
+    <resultMap id="KnowledgeChunkEmbeddingResultMap" type="com.example.demo.app.entity.KnowledgeChunkEmbedding">
+        <id column="id" property="id" />
+        <result column="chunk_id" property="chunkId" />
+        <result column="embedding_model" property="embeddingModel" />
+        <result column="embedding" property="embedding" />
+        <result column="embedding_dimension" property="embeddingDimension" />
+        <result column="created_at" property="createdAt" />
+        <result column="updated_at" property="updatedAt" />
+    </resultMap>
+
+    <sql id="KnowledgeChunkEmbedding_Column_List">
+        id, chunk_id, embedding_model, embedding, embedding_dimension, created_at, updated_at
+    </sql>
+
+    <insert id="insert" parameterType="com.example.demo.app.entity.KnowledgeChunkEmbedding"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO knowledge_chunk_embedding (
+            chunk_id, embedding_model, embedding, embedding_dimension, created_at, updated_at
+        ) VALUES (
+            #{chunkId}, #{embeddingModel}, #{embedding}, #{embeddingDimension}, NOW(), NOW()
+        )
+    </insert>
+
+    <insert id="insertBatch" parameterType="java.util.List">
+        INSERT INTO knowledge_chunk_embedding (
+            chunk_id, embedding_model, embedding, embedding_dimension, created_at, updated_at
+        ) VALUES
+        <foreach collection="embeddings" item="item" separator=",">
+            (#{item.chunkId}, #{item.embeddingModel}, #{item.embedding}, #{item.embeddingDimension}, NOW(), NOW())
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+            embedding = VALUES(embedding),
+            embedding_dimension = VALUES(embedding_dimension),
+            updated_at = NOW()
+    </insert>
+
+    <select id="selectById" resultMap="KnowledgeChunkEmbeddingResultMap">
+        SELECT <include refid="KnowledgeChunkEmbedding_Column_List" />
+        FROM knowledge_chunk_embedding
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByChunkIdAndModel" resultMap="KnowledgeChunkEmbeddingResultMap">
+        SELECT <include refid="KnowledgeChunkEmbedding_Column_List" />
+        FROM knowledge_chunk_embedding
+        WHERE chunk_id = #{chunkId} AND embedding_model = #{model}
+        LIMIT 1
+    </select>
+
+    <select id="selectByChunkId" resultMap="KnowledgeChunkEmbeddingResultMap">
+        SELECT <include refid="KnowledgeChunkEmbedding_Column_List" />
+        FROM knowledge_chunk_embedding
+        WHERE chunk_id = #{chunkId}
+    </select>
+
+    <delete id="deleteByChunkId">
+        DELETE FROM knowledge_chunk_embedding
+        WHERE chunk_id = #{chunkId}
+    </delete>
+
+</mapper>
+

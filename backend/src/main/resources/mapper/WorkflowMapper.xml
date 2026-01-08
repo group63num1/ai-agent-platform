@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.demo.app.mapper.WorkflowMapper">
+
+    <resultMap id="WorkflowResultMap" type="com.example.demo.app.entity.Workflow">
+        <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
+        <result column="name" property="name"/>
+        <result column="intro" property="intro"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="WorkflowColumns">
+        id, user_id, name, intro, created_at, updated_at
+    </sql>
+
+    <insert id="insert" parameterType="com.example.demo.app.entity.Workflow" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO workflows (user_id, name, intro, created_at, updated_at)
+        VALUES (#{userId}, #{name}, #{intro}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <update id="update" parameterType="com.example.demo.app.entity.Workflow">
+        UPDATE workflows
+        <set>
+            <if test="name != null">name = #{name},</if>
+            <if test="intro != null">intro = #{intro},</if>
+            <if test="updatedAt != null">updated_at = #{updatedAt},</if>
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectById" resultMap="WorkflowResultMap">
+        SELECT <include refid="WorkflowColumns"/>
+        FROM workflows
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByUserId" resultMap="WorkflowResultMap">
+        SELECT <include refid="WorkflowColumns"/>
+        FROM workflows
+        WHERE user_id = #{userId}
+        ORDER BY updated_at DESC
+    </select>
+
+    <delete id="deleteById">
+        DELETE FROM workflows WHERE id = #{id}
+    </delete>
+
+</mapper>

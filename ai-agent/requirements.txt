@@ -1,0 +1,16 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+pydantic>=2.0.0
+requests
+aiohttp
+sqlalchemy
+pymysql
+pymilvus>=2.6.0
+cryptography
+langchain-core
+langchain-community
+langchain-text-splitters
+sentence-transformers
+pypdf
+numpy

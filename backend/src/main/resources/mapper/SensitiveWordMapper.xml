@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.demo.app.mapper.SensitiveWordMapper">
+
+    <resultMap id="SensitiveWordResultMap" type="com.example.demo.app.entity.SensitiveWord">
+        <id column="id" property="id" />
+        <result column="word" property="word" />
+        <result column="category" property="category" />
+        <result column="level" property="level" />
+        <result column="action" property="action" />
+        <result column="replacement" property="replacement" />
+        <result column="status" property="status" />
+        <result column="description" property="description" />
+        <result column="created_at" property="createdAt" />
+        <result column="updated_at" property="updatedAt" />
+    </resultMap>
+
+    <sql id="SensitiveWord_Column_List">
+        id, word, category, level, action, replacement, status, description, created_at, updated_at
+    </sql>
+
+    <insert id="insert" parameterType="com.example.demo.app.entity.SensitiveWord"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO sensitive_words (
+            word, category, level, action, replacement, status, description, created_at, updated_at
+        ) VALUES (
+            #{word}, #{category}, #{level}, #{action}, #{replacement}, #{status}, #{description}, NOW(), NOW()
+        )
+    </insert>
+
+    <select id="selectById" resultMap="SensitiveWordResultMap">
+        SELECT <include refid="SensitiveWord_Column_List" />
+        FROM sensitive_words
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectAll" resultMap="SensitiveWordResultMap">
+        SELECT <include refid="SensitiveWord_Column_List" />
+        FROM sensitive_words
+        ORDER BY level DESC, created_at DESC
+    </select>
+
+    <select id="selectByCategory" resultMap="SensitiveWordResultMap">
+        SELECT <include refid="SensitiveWord_Column_List" />
+        FROM sensitive_words
+        WHERE category = #{category}
+        ORDER BY level DESC
+    </select>
+
+    <select id="selectByLevel" resultMap="SensitiveWordResultMap">
+        SELECT <include refid="SensitiveWord_Column_List" />
+        FROM sensitive_words
+        WHERE level = #{level}
+        ORDER BY created_at DESC
+    </select>
+
+    <select id="selectByStatus" resultMap="SensitiveWordResultMap">
+        SELECT <include refid="SensitiveWord_Column_List" />
+        FROM sensitive_words
+        WHERE status = #{status}
+        ORDER BY level DESC, created_at DESC
+    </select>
+
+    <select id="selectActive" resultMap="SensitiveWordResultMap">
+        SELECT <include refid="SensitiveWord_Column_List" />
+        FROM sensitive_words
+        WHERE status = 1
+        ORDER BY level DESC, created_at DESC
+    </select>
+
+    <update id="update" parameterType="com.example.demo.app.entity.SensitiveWord">
+        UPDATE sensitive_words
+        <set>
+            <if test="word != null">word = #{word},</if>
+            <if test="category != null">category = #{category},</if>
+            <if test="level != null">level = #{level},</if>
+            <if test="action != null">action = #{action},</if>
+            <if test="replacement != null">replacement = #{replacement},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="description != null">description = #{description},</if>
+            updated_at = NOW()
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <delete id="delete">
+        DELETE FROM sensitive_words
+        WHERE id = #{id}
+    </delete>
+
+    <select id="countByWord" resultType="int">
+        SELECT COUNT(*)
+        FROM sensitive_words
+        WHERE word = #{word}
+    </select>
+
+</mapper>
+

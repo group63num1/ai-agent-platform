@@ -1,0 +1,23 @@
+[0;1;31m●[0m ai-backend.service - AI Agent Java Backend
+     Loaded: loaded (/etc/systemd/system/ai-backend.service; enabled; vendor preset: enabled)
+     Active: [0;1;31mfailed[0m (Result: exit-code) since Mon 2025-12-22 07:18:28 CST; 5min ago
+   Main PID: 309987 (code=exited, status=200/CHDIR)
+
+Dec 22 07:18:28 ecs-ce6d systemd[1]: ai-backend.service: Scheduled restart job, restart counter is at 5.
+Dec 22 07:18:28 ecs-ce6d systemd[1]: Stopped AI Agent Java Backend.
+Dec 22 07:18:28 ecs-ce6d systemd[1]: [0;1;38;5;185m[0;1;39m[0;1;38;5;185mai-backend.service: Start request repeated too quickly.[0m
+Dec 22 07:18:28 ecs-ce6d systemd[1]: [0;1;38;5;185m[0;1;39m[0;1;38;5;185mai-backend.service: Failed with result 'exit-code'.[0m
+Dec 22 07:18:28 ecs-ce6d systemd[1]: [0;1;31m[0;1;39m[0;1;31mFailed to start AI Agent Java Backend.[0m
+[0;1;31m●[0m ai-backend.service - AI Agent Java Backend
+     Loaded: loaded (/etc/systemd/system/ai-backend.service; enabled; vendor preset: enabled)
+     Active: [0;1;31mfailed[0m (Result: exit-code) since Mon 2025-12-22 07:25:01 CST; 46s ago
+    Process: 314304 ExecStart=/usr/bin/java -jar /opt/ai-agent-platform/backend/target/demo-0.0.1-SNAPSHOT.jar --server.port=28080 [0;1;31m(code=exited, status=1/FAILURE)[0m
+   Main PID: 314304 (code=exited, status=1/FAILURE)
+
+Dec 22 07:25:01 ecs-ce6d systemd[1]: [0;1;39m[0;1;31m[0;1;39mai-backend.service: Main process exited, code=exited, status=1/FAILURE[0m
+Dec 22 07:25:01 ecs-ce6d systemd[1]: [0;1;38;5;185m[0;1;39m[0;1;38;5;185mai-backend.service: Failed with result 'exit-code'.[0m
+Dec 22 07:25:01 ecs-ce6d systemd[1]: ai-backend.service: Scheduled restart job, restart counter is at 5.
+Dec 22 07:25:01 ecs-ce6d systemd[1]: Stopped AI Agent Java Backend.
+Dec 22 07:25:01 ecs-ce6d systemd[1]: [0;1;38;5;185m[0;1;39m[0;1;38;5;185mai-backend.service: Start request repeated too quickly.[0m
+Dec 22 07:25:01 ecs-ce6d systemd[1]: [0;1;38;5;185m[0;1;39m[0;1;38;5;185mai-backend.service: Failed with result 'exit-code'.[0m
+Dec 22 07:25:01 ecs-ce6d systemd[1]: [0;1;31m[0;1;39m[0;1;31mFailed to start AI Agent Java Backend.[0m

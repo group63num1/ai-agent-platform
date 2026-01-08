@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.demo.app.mapper.KnowledgeDocumentMapper">
+
+    <resultMap id="KnowledgeDocumentResultMap" type="com.example.demo.app.entity.KnowledgeDocument">
+        <id column="id" property="id" />
+        <result column="user_id" property="userId" />
+        <result column="title" property="title" />
+        <result column="file_name" property="fileName" />
+        <result column="file_type" property="fileType" />
+        <result column="file_size" property="fileSize" />
+        <result column="file_path" property="filePath" />
+        <result column="content" property="content" />
+        <result column="content_hash" property="contentHash" />
+        <result column="status" property="status" />
+        <result column="chunk_count" property="chunkCount" />
+        <result column="error_message" property="errorMessage" />
+        <result column="created_at" property="createdAt" />
+        <result column="updated_at" property="updatedAt" />
+        <result column="is_deleted" property="isDeleted" />
+    </resultMap>
+
+    <sql id="KnowledgeDocument_Column_List">
+        id, user_id, title, file_name, file_type, file_size, file_path, content,
+        content_hash, status, chunk_count, error_message, created_at, updated_at, is_deleted
+    </sql>
+
+    <insert id="insert" parameterType="com.example.demo.app.entity.KnowledgeDocument"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO knowledge_document (
+            user_id, title, file_name, file_type, file_size, file_path, content,
+            content_hash, status, chunk_count, error_message, created_at, updated_at, is_deleted
+        ) VALUES (
+            #{userId}, #{title}, #{fileName}, #{fileType}, #{fileSize}, #{filePath}, #{content},
+            #{contentHash}, #{status}, #{chunkCount}, #{errorMessage}, NOW(), NOW(), 0
+        )
+    </insert>
+
+    <select id="selectById" resultMap="KnowledgeDocumentResultMap">
+        SELECT <include refid="KnowledgeDocument_Column_List" />
+        FROM knowledge_document
+        WHERE id = #{id} AND is_deleted = 0
+    </select>
+
+    <select id="selectByUserId" resultMap="KnowledgeDocumentResultMap">
+        SELECT <include refid="KnowledgeDocument_Column_List" />
+        FROM knowledge_document
+        WHERE user_id = #{userId}
+        <if test="includeDeleted == null or includeDeleted == false">
+            AND is_deleted = 0
+        </if>
+        ORDER BY created_at DESC
+    </select>
+
+    <update id="update" parameterType="com.example.demo.app.entity.KnowledgeDocument">
+        UPDATE knowledge_document
+        <set>
+            <if test="title != null">title = #{title},</if>
+            <if test="fileName != null">file_name = #{fileName},</if>
+            <if test="fileType != null">file_type = #{fileType},</if>
+            <if test="fileSize != null">file_size = #{fileSize},</if>
+            <if test="filePath != null">file_path = #{filePath},</if>
+            <if test="content != null">content = #{content},</if>
+            <if test="contentHash != null">content_hash = #{contentHash},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="chunkCount != null">chunk_count = #{chunkCount},</if>
+            <if test="errorMessage != null">error_message = #{errorMessage},</if>
+            updated_at = NOW()
+        </set>
+        WHERE id = #{id} AND is_deleted = 0
+    </update>
+
+    <update id="softDelete">
+        UPDATE knowledge_document
+        SET is_deleted = 1, updated_at = NOW()
+        WHERE id = #{id} AND is_deleted = 0
+    </update>
+
+    <update id="updateStatus">
+        UPDATE knowledge_document
+        SET status = #{status},
+            <if test="errorMessage != null">error_message = #{errorMessage},</if>
+            updated_at = NOW()
+        WHERE id = #{id} AND is_deleted = 0
+    </update>
+
+    <update id="updateChunkCount">
+        UPDATE knowledge_document
+        SET chunk_count = #{chunkCount}, updated_at = NOW()
+        WHERE id = #{id} AND is_deleted = 0
+    </update>
+
+</mapper>
+

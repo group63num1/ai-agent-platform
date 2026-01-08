@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.demo.app.mapper.SecurityRuleMapper">
+
+    <resultMap id="SecurityRuleResultMap" type="com.example.demo.app.entity.SecurityRule">
+        <id column="id" property="id" />
+        <result column="rule_name" property="ruleName" />
+        <result column="rule_type" property="ruleType" />
+        <result column="pattern" property="pattern" />
+        <result column="category" property="category" />
+        <result column="risk_level" property="riskLevel" />
+        <result column="action" property="action" />
+        <result column="warning_message" property="warningMessage" />
+        <result column="guidance" property="guidance" />
+        <result column="status" property="status" />
+        <result column="priority" property="priority" />
+        <result column="description" property="description" />
+        <result column="created_at" property="createdAt" />
+        <result column="updated_at" property="updatedAt" />
+    </resultMap>
+
+    <sql id="SecurityRule_Column_List">
+        id, rule_name, rule_type, pattern, category, risk_level, action, warning_message,
+        guidance, status, priority, description, created_at, updated_at
+    </sql>
+
+    <insert id="insert" parameterType="com.example.demo.app.entity.SecurityRule"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO security_rules (
+            rule_name, rule_type, pattern, category, risk_level, action, warning_message,
+            guidance, status, priority, description, created_at, updated_at
+        ) VALUES (
+            #{ruleName}, #{ruleType}, #{pattern}, #{category}, #{riskLevel}, #{action},
+            #{warningMessage}, #{guidance}, #{status}, #{priority}, #{description}, NOW(), NOW()
+        )
+    </insert>
+
+    <select id="selectById" resultMap="SecurityRuleResultMap">
+        SELECT <include refid="SecurityRule_Column_List" />
+        FROM security_rules
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectAll" resultMap="SecurityRuleResultMap">
+        SELECT <include refid="SecurityRule_Column_List" />
+        FROM security_rules
+        ORDER BY priority DESC, risk_level DESC, created_at DESC
+    </select>
+
+    <select id="selectByType" resultMap="SecurityRuleResultMap">
+        SELECT <include refid="SecurityRule_Column_List" />
+        FROM security_rules
+        WHERE rule_type = #{ruleType}
+        ORDER BY priority DESC, risk_level DESC
+    </select>
+
+    <select id="selectByCategory" resultMap="SecurityRuleResultMap">
+        SELECT <include refid="SecurityRule_Column_List" />
+        FROM security_rules
+        WHERE category = #{category}
+        ORDER BY priority DESC, risk_level DESC
+    </select>
+
+    <select id="selectByRiskLevel" resultMap="SecurityRuleResultMap">
+        SELECT <include refid="SecurityRule_Column_List" />
+        FROM security_rules
+        WHERE risk_level = #{riskLevel}
+        ORDER BY priority DESC
+    </select>
+
+    <select id="selectActive" resultMap="SecurityRuleResultMap">
+        SELECT <include refid="SecurityRule_Column_List" />
+        FROM security_rules
+        WHERE status = 1
+        ORDER BY priority DESC, risk_level DESC, created_at DESC
+    </select>
+
+    <update id="update" parameterType="com.example.demo.app.entity.SecurityRule">
+        UPDATE security_rules
+        <set>
+            <if test="ruleName != null">rule_name = #{ruleName},</if>
+            <if test="ruleType != null">rule_type = #{ruleType},</if>
+            <if test="pattern != null">pattern = #{pattern},</if>
+            <if test="category != null">category = #{category},</if>
+            <if test="riskLevel != null">risk_level = #{riskLevel},</if>
+            <if test="action != null">action = #{action},</if>
+            <if test="warningMessage != null">warning_message = #{warningMessage},</if>
+            <if test="guidance != null">guidance = #{guidance},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="priority != null">priority = #{priority},</if>
+            <if test="description != null">description = #{description},</if>
+            updated_at = NOW()
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <delete id="delete">
+        DELETE FROM security_rules
+        WHERE id = #{id}
+    </delete>
+
+</mapper>
+

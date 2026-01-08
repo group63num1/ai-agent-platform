@@ -1,0 +1,79 @@
+  {
+  "openapi": "3.0.0",
+  "info": {
+    "title": "天气查询API",
+    "description": "根据城市名字查询当前或未来天气（高德天气查询接口）",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://restapi.amap.com/v3",
+      "description": "高德地图API服务器"
+    }
+  ],
+  "paths": {
+    "/weather/weatherInfo": {
+      "get": {
+        "summary": "查询天气信息",
+        "description": "根据城市名字查询当前或未来天气",
+        "operationId": "getWeatherInfo",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "query",
+            "description": "高德 Web API key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "YOUR_API_KEY"
+          },
+          {
+            "name": "city",
+            "in": "query",
+            "description": "城市名字例如：北京",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "北京"
+          },
+          {
+            "name": "extensions",
+            "in": "query",
+            "description": "base=实况天气；all=预报天气",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["base", "all"],
+              "default": "base"
+            }
+          },
+          {
+            "name": "output",
+            "in": "query",
+            "description": "返回格式，默认 JSON",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["JSON", "XML"],
+              "default": "JSON"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功返回天气信息",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

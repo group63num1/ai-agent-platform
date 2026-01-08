@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.demo.app.mapper.WorkflowNodeMapper">
+
+    <resultMap id="WorkflowNodeResultMap" type="com.example.demo.app.entity.WorkflowNode">
+        <id column="id" property="id"/>
+        <result column="workflow_id" property="workflowId"/>
+        <result column="seq" property="seq"/>
+        <result column="agent_id" property="agentId"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <sql id="WorkflowNodeColumns">
+        id, workflow_id, seq, agent_id, created_at
+    </sql>
+
+    <insert id="insert" parameterType="com.example.demo.app.entity.WorkflowNode" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO workflow_nodes (workflow_id, seq, agent_id, created_at)
+        VALUES (#{workflowId}, #{seq}, #{agentId}, #{createdAt})
+    </insert>
+
+    <delete id="deleteByWorkflowId">
+        DELETE FROM workflow_nodes WHERE workflow_id = #{workflowId}
+    </delete>
+
+    <select id="selectByWorkflowId" resultMap="WorkflowNodeResultMap">
+        SELECT <include refid="WorkflowNodeColumns"/>
+        FROM workflow_nodes
+        WHERE workflow_id = #{workflowId}
+        ORDER BY seq ASC
+    </select>
+
+</mapper>

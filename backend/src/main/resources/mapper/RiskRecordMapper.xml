@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.demo.app.mapper.RiskRecordMapper">
+
+    <resultMap id="RiskRecordResultMap" type="com.example.demo.app.entity.RiskRecord">
+        <id column="id" property="id" />
+        <result column="user_id" property="userId" />
+        <result column="session_id" property="sessionId" />
+        <result column="message_id" property="messageId" />
+        <result column="risk_type" property="riskType" />
+        <result column="risk_level" property="riskLevel" />
+        <result column="content" property="content" />
+        <result column="matched_rule" property="matchedRule" />
+        <result column="action" property="action" />
+        <result column="details" property="details" />
+        <result column="ip_address" property="ipAddress" />
+        <result column="user_agent" property="userAgent" />
+        <result column="created_at" property="createdAt" />
+    </resultMap>
+
+    <sql id="RiskRecord_Column_List">
+        id, user_id, session_id, message_id, risk_type, risk_level, content, matched_rule,
+        action, details, ip_address, user_agent, created_at
+    </sql>
+
+    <insert id="insert" parameterType="com.example.demo.app.entity.RiskRecord"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO risk_records (
+            user_id, session_id, message_id, risk_type, risk_level, content, matched_rule,
+            action, details, ip_address, user_agent, created_at
+        ) VALUES (
+            #{userId}, #{sessionId}, #{messageId}, #{riskType}, #{riskLevel}, #{content},
+            #{matchedRule}, #{action}, #{details}, #{ipAddress}, #{userAgent}, NOW()
+        )
+    </insert>
+
+    <select id="selectById" resultMap="RiskRecordResultMap">
+        SELECT <include refid="RiskRecord_Column_List" />
+        FROM risk_records
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByUserId" resultMap="RiskRecordResultMap">
+        SELECT <include refid="RiskRecord_Column_List" />
+        FROM risk_records
+        WHERE user_id = #{userId}
+        ORDER BY created_at DESC
+    </select>
+
+    <select id="selectBySessionId" resultMap="RiskRecordResultMap">
+        SELECT <include refid="RiskRecord_Column_List" />
+        FROM risk_records
+        WHERE session_id = #{sessionId}
+        ORDER BY created_at DESC
+    </select>
+
+    <select id="selectByRiskType" resultMap="RiskRecordResultMap">
+        SELECT <include refid="RiskRecord_Column_List" />
+        FROM risk_records
+        WHERE risk_type = #{riskType}
+        ORDER BY created_at DESC
+    </select>
+
+    <select id="selectByRiskLevel" resultMap="RiskRecordResultMap">
+        SELECT <include refid="RiskRecord_Column_List" />
+        FROM risk_records
+        WHERE risk_level = #{riskLevel}
+        ORDER BY created_at DESC
+    </select>
+
+    <select id="selectByTimeRange" resultMap="RiskRecordResultMap">
+        SELECT <include refid="RiskRecord_Column_List" />
+        FROM risk_records
+        WHERE created_at BETWEEN #{startTime} AND #{endTime}
+        ORDER BY created_at DESC
+    </select>
+
+    <select id="selectHighRisk" resultMap="RiskRecordResultMap">
+        SELECT <include refid="RiskRecord_Column_List" />
+        FROM risk_records
+        WHERE risk_level >= 3
+        ORDER BY risk_level DESC, created_at DESC
+    </select>
+
+    <select id="countByUserId" resultType="int">
+        SELECT COUNT(*)
+        FROM risk_records
+        WHERE user_id = #{userId}
+    </select>
+
+    <select id="countByRiskLevel" resultType="int">
+        SELECT COUNT(*)
+        FROM risk_records
+        WHERE risk_level = #{riskLevel}
+    </select>
+
+    <delete id="deleteOldRecords">
+        DELETE FROM risk_records
+        WHERE created_at &lt; #{beforeTime}
+    </delete>
+
+</mapper>
+

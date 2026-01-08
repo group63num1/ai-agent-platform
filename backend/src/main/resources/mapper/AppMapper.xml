@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.demo.app.mapper.AppMapper">
+
+    <resultMap id="AppResultMap" type="AppEntity">
+        <id property="id" column="id"/>
+        <result property="name" column="name"/>
+        <result property="description" column="description"/>
+        <result property="fullDescription" column="full_description"/>
+        <result property="avatar" column="avatar"/>
+        <result property="category" column="category"/>
+        <result property="price" column="price"/>
+        <result property="rating" column="rating"/>
+        <result property="downloads" column="downloads"/>
+        <result property="reviews" column="reviews"/>
+        <result property="author" column="author"/>
+        <result property="publishedAt" column="published_at"/>
+    </resultMap>
+
+    <!-- 查询所有应用 -->
+    <select id="findAllOrderById" resultMap="AppResultMap">
+        SELECT * FROM t_app ORDER BY id ASC
+    </select>
+
+    <!-- 根据 ID 查询 -->
+    <select id="findById" resultMap="AppResultMap">
+        SELECT * FROM t_app WHERE id = #{id}
+    </select>
+
+    <!-- 根据分类查询 -->
+    <select id="findByCategory" resultMap="AppResultMap">
+        SELECT * FROM t_app WHERE category = #{category} ORDER BY id ASC
+    </select>
+
+    <!-- 按评分排序 -->
+    <select id="findAllOrderByRatingAsc" resultMap="AppResultMap">
+        SELECT * FROM t_app ORDER BY rating ASC
+    </select>
+    <select id="findAllOrderByRatingDesc" resultMap="AppResultMap">
+        SELECT * FROM t_app ORDER BY rating DESC
+    </select>
+
+    <!-- 按下载量排序 -->
+    <select id="findAllOrderByDownloadsAsc" resultMap="AppResultMap">
+        SELECT * FROM t_app ORDER BY downloads ASC
+    </select>
+    <select id="findAllOrderByDownloadsDesc" resultMap="AppResultMap">
+        SELECT * FROM t_app ORDER BY downloads DESC
+    </select>
+
+    <!-- 按分类和评分排序 -->
+    <select id="findByCategoryOrderByRatingAsc" resultMap="AppResultMap">
+        SELECT * FROM t_app WHERE category = #{category} ORDER BY rating ASC
+    </select>
+    <select id="findByCategoryOrderByRatingDesc" resultMap="AppResultMap">
+        SELECT * FROM t_app WHERE category = #{category} ORDER BY rating DESC
+    </select>
+
+    <!-- 按分类和下载量排序 -->
+    <select id="findByCategoryOrderByDownloadsAsc" resultMap="AppResultMap">
+        SELECT * FROM t_app WHERE category = #{category} ORDER BY downloads ASC
+    </select>
+    <select id="findByCategoryOrderByDownloadsDesc" resultMap="AppResultMap">
+        SELECT * FROM t_app WHERE category = #{category} ORDER BY downloads DESC
+    </select>
+
+</mapper>
